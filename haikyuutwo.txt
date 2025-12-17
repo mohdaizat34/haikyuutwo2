@@ -1,0 +1,12 @@
+"haikyuutwo"
+{
+    "base" "Haikyuu To the Top"
+    "title" "Gmod Volleyball 2.0"
+    "maps" "^gm_"
+    "menusystem" "1"
+    
+    "Settings" 
+    {
+        // Add your settings here if needed
+    }
+}
