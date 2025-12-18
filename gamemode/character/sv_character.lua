@@ -43,7 +43,7 @@ net.Receive ("character_select" , function(bits , ply )
 	--ply:ConCommand("playermodel_selector")
 	-- ply:ConCommand("pac_allow_mdl 0")
 	-- ply:ConCommand("pac_modifier_model 0")
-	timer.Simple(10,function()
+	timer.Simple(2,function()
 		ply:ConCommand("pac_wear_parts") 
 	end) 
 

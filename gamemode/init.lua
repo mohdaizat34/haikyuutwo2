@@ -47,9 +47,9 @@ util.AddNetworkString("random_system")
 GM.Name = "Gmod Volleyball 2.0"
 
 function GM:PlayerInitialSpawn(ply) 
-	timer.Simple(10,function()
-		-- url = "https://pastebin.com/raw/bWbQdALs"
-		-- ply:ConCommand('pac_load_url "'..url.. '"')
+	timer.Simple(5,function()
+		url = "https://pastebin.com/raw/cgsbmMqB"
+		ply:ConCommand('pac_load_url "'..url.. '"')
 
 
 		ply:ConCommand("pac_wear_parts") 

@@ -32,8 +32,8 @@ pos4 = Vector(pos2.x,319.357361, pos2.z)
 local control_panel_open = true
 
 local MainFrame = vgui.Create("DFrame")
-MainFrame:SetSize(ScrW()/6, ScrH()/1.5)
-MainFrame:SetPos(ScrW()/1.17, ScrH()/14.4)
+MainFrame:SetSize(ScrW()/4, ScrH() * 0.8)
+MainFrame:SetPos(ScrW() * 0.75, ScrH()/14.4)
 MainFrame:SetTitle("Help & Controls (Press F3 to hide)")
 MainFrame:SetVisible(true)
 MainFrame:SetBackgroundBlur( true )
@@ -48,20 +48,32 @@ scroll:Dock(FILL)
 -- Rules section
 local rulesHeader = vgui.Create("DLabel", scroll)
 rulesHeader:Dock(TOP)
-rulesHeader:SetText("Rules")
+rulesHeader:SetText("Gameplay Mechanics")
 rulesHeader:SetFont("Trebuchet24")
 rulesHeader:SetTextColor(Color(255,255,0))
 rulesHeader:SizeToContents()
 rulesHeader:DockMargin(10, 10, 10, 5)
 
-local rulesText = vgui.Create("DLabel", scroll)
-rulesText:Dock(TOP)
-rulesText:SetText("1. The ball can still be received even if it reached the ground WITHIN 0.5 seconds.\nNote: You can turn on the buzzer to know if it is 0.5 (at the ref stand)\n\n2. You cannot block using Spike.\n\n3. If player received with multiple receive sound effects (not obvious Double touch) and the player is having high ping. It is acceptable. Keep the game going.")
-rulesText:SetFont("CenterPrintText")
-rulesText:SetTextColor(Color(255,255,255))
-rulesText:SetWrap(true)
-rulesText:SetAutoStretchVertical(true)
-rulesText:DockMargin(10, 5, 10, 10)
+-- Rules list for easy addition
+local rules = {
+    "1. PERFECT RECEIVE depends on timing and distance — the closer you are to the ball, the higher the success rate.",
+    "2. PERFECT RECEIVE is 100% guaranteed while crouching.",
+    "3. SERVE is only allowed from the service area — right-click to serve when inside the zone.",
+    "4. ACTION MODE: SPIKE allows the player to spike the ball while airborne, but disables BLOCK and SET.",
+    "5. ACTION MODE: BLOCK allows the player to block while airborne and enables SET.",
+    "6. ACTION MODE: Can't be switched while airborne or approaching",
+}
+
+for _, ruleText in ipairs(rules) do
+    local ruleLabel = vgui.Create("DLabel", scroll)
+    ruleLabel:Dock(TOP)
+    ruleLabel:SetText(ruleText)
+    ruleLabel:SetFont("CenterPrintText")
+    ruleLabel:SetTextColor(Color(255,255,255))
+    ruleLabel:SetWrap(true)
+    ruleLabel:SetAutoStretchVertical(true)
+    ruleLabel:DockMargin(10, 5, 10, 10)
+end
 
 -- Features & Controls section
 local controlsHeader = vgui.Create("DLabel", scroll)
@@ -73,19 +85,35 @@ controlsHeader:SizeToContents()
 controlsHeader:DockMargin(10, 10, 10, 5)
 
 -- Controls
+-- Controls
 local controls = {
+    -- Basic Movement / Jump
     "[SPACEBAR] - Jump",
+
+    -- Ball Interaction
+    "[E] - Pickup ball",
+    "[KEY_V (hold)] - Receive (On Ground)",
+    "[MOUSE_LEFT (hold)] - Spike [ACTION SPIKE] / Set [ACTION BLOCK]",
+    "[MOUSE_RIGHT (Behind serve line)] - Basic Serve",
+
+    -- Power & Action Modes
     "[KEY_1] - Set Spike Power",
     "[KEY_2] - Set Receive Power",
-    "[KEY_V (hold)] - Receive (On Ground)",
-    "[MOUSE_LEFT (hold)] - Spike (Off Ground)",
-    "[MOUSE_RIGHT (Behind serve line)] - Basic Serve",
+    "[KEY_3] - Set Shoot Toss: FRONT / BACK",
+    "[KEY_4] - Set Action Mode: BLOCK / SET",
+
+    -- Character / Team
     "[F1] - Character Controls",
-    "[E] - Pickup ball",
-    "[KEY_K / KEY_L] - Taunt/Cheer",
-    "[KEY_M] - Change Character/Switch Team",
-    "[KEY_B] - Communication"
+    "[KEY_M] - Change Character / Switch Team",
+
+    -- Communication / Emotes
+    "[KEY_K / KEY_L] - Taunt / Cheer",
+    "[KEY_B] - Communication (After joining a team)",
+
+    -- Game Settings
+    "[KEY_N] - Game Settings",
 }
+
 
 for _, text in ipairs(controls) do
     local lbl = vgui.Create("DLabel", scroll)
@@ -360,3 +388,18 @@ hook.Add("HUDPaint", "TopLeftIcons", function()
 end)
 
 hook.Add("HUDPaint", "LoopThroughPlayers", LoopThroughPlayers)
+
+-- Vertical sidebar for F3 toggle reminder
+hook.Add("HUDPaint", "LeftSidebarF3", function()
+    if not control_panel_open then return end
+    local text = "F3 TO CLOSE/OPEN"
+    local font = "Trebuchet24"
+    surface.SetFont(font)
+    local textWidth, textHeight = surface.GetTextSize(text)
+    local x = ScrW() * 0.75 - 40 - textWidth  -- Adjust to fit beside the panel
+    local y = ScrH() / 2 - textHeight / 2  -- Center vertically
+    -- Draw background for contrast
+    draw.RoundedBox(8, x - 5, y - 5, textWidth + 10, textHeight + 10, Color(0, 0, 0, 150))
+    -- Draw text horizontally
+    draw.SimpleText(text, font, x, y, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+end)

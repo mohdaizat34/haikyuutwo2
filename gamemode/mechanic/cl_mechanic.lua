@@ -72,8 +72,8 @@ ball_detect.Paint = function( self, w, h ) -- 'function Frame:Paint( w, h )' wor
 	draw.RoundedBox( 255, 0, 0, w, h, Color( 0,0,0,0) )
 end
  
-pos1 = Vector(1419.853394, 1000.308411, -165.108414)
-pos2 = Vector(602.493164, 319.357361, 398.086914)
+pos1 = Vector( -134.029663, 764.290222,-71.224037)
+pos2 = Vector(  -556.752686, 324.668060, 218.018539)
 -- Calculate the mirrored positions for the right side with reduced width
 pos3 = Vector(pos1.x, -pos1.y, pos1.z)
 pos4 = Vector(pos2.x,319.357361, pos2.z)
@@ -194,7 +194,7 @@ function SetSpikePowerByCharacter(char)
     end
     
     -- Reinitialize spike system with new power values if spike mode is active
-    if actionMode.spike and jumpActivated then
+    if actionMode.spike then
         hook.Remove("Tick", "KeyDown_Spike")
         SpikePower(spikePower.force, spikePower.power)
     end
@@ -1911,12 +1911,7 @@ function TossPower(setForce)
 
 
 	hook.Add( "Tick", "KeyDown_Toss", function()
-		local keySetting
-		if allow_left_assist == false then
-			keySetting = KEY_C
-		else
-			keySetting = KEY_SLASH
-		end
+		local keySetting = MOUSE_LEFT
 
 		if (input.IsButtonDown(keySetting)) then
 			buttonpresstoss = 1
@@ -2597,8 +2592,10 @@ hook.Add("HUDPaint", "BallLandingPredictionHUD", function()
 end)
 
 -- Initialize spike mode functions
-SpikeApproachAnimation()
-SpikePower(spikePower.force, spikePower.power)
+timer.Simple(3,function()
+	SpikeApproachAnimation()
+end)
+
 
 
 

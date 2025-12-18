@@ -10,19 +10,6 @@ function GM:Initialize()
 end   
  
 
-timer.Simple(1,function() 
-	hook.Add("PlayerButtonDown", "ZoomCharacter", function(ply,button)
-		local zoomSpeed = 5 -- Adjust as needed
-		local minFOV = 60
-		local maxFOV = 140
-	
-		if button == MOUSE_WHEEL_UP then
-			ply:SetFOV(math.Clamp(ply:GetFOV() - zoomSpeed, minFOV, maxFOV), 0.1)
-		elseif button == MOUSE_WHEEL_DOWN then
-			ply:SetFOV(math.Clamp(ply:GetFOV() + zoomSpeed, minFOV, maxFOV), 0.1)
-		end
-	end)
-end)
 
 if SERVER then return end -- Only run on client side
 

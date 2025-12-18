@@ -1362,36 +1362,6 @@ character_control.Paint = function( self, w, h ) -- 'function Frame:Paint( w, h 
 draw.RoundedBox( 0, 0, 0, w, h, Color( 0,0,0,0) )      
 end 
 
-hook.Add("PlayerButtonDown","openControl",function(ply,button)
-	if button == KEY_F1 then 
-		ControlFrame:SetVisible(true)
-		if character == "hinata" then 
-			character_control:SetText("Hinata Shoyo\n\nAble to Jump Higher than anyone else.\nYou can Jump+CTRL for Maximum Vertical.\n\nControls\n\nF2 - Thirdperson\n(Static Serve) - R.Click\nV(On ground)- Receive (Can Hold for Higher receive)\nV(On air) - Feint\nL.Click - Spike (Hold for more Power)\nQ - Block")
-		elseif character == "kageyama" then 
-			character_control:SetText("Kageyama Tobio\n\nYou can do freak toss that stops a.k.a King Toss\n\nControls\n\nF2 - Thirdperson\n(Static Serve) - R.Click\n\nV(On ground)- Receive (Can Hold for Higher receive)\nV(On air) - Feint\nL.Click - Spike (Power Does nothing)\nQ - Soft Block\nC- Set(Hold for higher and farther toss)\nF- Backset(Hold for higher and farther toss)\nTips for setting: The more you aim down the lower toss arc will be\nR - King Toss\nMIDDLE MOUSE- Shoot Toss\n\nALT - Setter Signal")
-		
-		elseif character == "kenma" then 
-		character_control:SetText("Kenma Kozume\n\nSpeciality: Dump (R- Left dump  T- Right Dump)\n\nShoot Toss: MIDDLE MOUSE")
-
-		elseif character == "yamaguchi" then 
-			character_control:SetText("Tadashi Yamaguchi\n\nWhen standing anywhere in serve line.Player can press R to activate Float Serve.\n(Static Serve) - R.Click\nFloat Serve - Press R to toss up and T to hit\nThe Float serve will drop left or right/short or long randomly.\n\nControls\n\nF2 - Thirdperson\nV(On ground)- Receive (Can Hold for Higher receive)\nV(On air) - Feint\nL.Click - Spike (Power Does nothing)\nQ - Soft Block")
-		elseif character == "tsukishima" then 
-			character_control:SetText("Tsukishima Kei\n\nAble to  Block with Wide range. Good to block Line or Cross.\n\n\n\nControls\n\n (Static Serve) - R.Click\nF2 - Thirdperson\nV - Receive (Can Hold for Higher receive)\nB - Spike (Power Does nothing)\nQ - Block")
-	
-		elseif character == "miya" then 
-			character_control:SetText("Miya Atsumu\n\nWhen standing anywhere in serve line.Player can press R to activate Powerful Jump Serve.\n\nCONTROLS\n\nF2 - Thirdperson\n(Static Serve) - R.Click\nJump Serve - Press R to tossup the ball and T to hit.\nAfter hit, player can aim the ball on where to drop.(will create swing effect)\nV(On ground)- Receive (Can Hold for Higher receive)\nV(On air) - Feint\nL.Click - Spike (Power Does nothing)\nC- Set(Hold for higher and farther toss) \nF- Backset(Hold for higher and farther toss)\nMIDDLE MOUSE - Shoot Toss\n Tips for setting: The more you aim down the lower toss arc will be\n\nALT - Setter Signal")
-		elseif character == "ushijima" then	
-			character_control:SetText("Wakatoshi Ushijima\n\nAble to Super Spike when Bar is fully charged.\nYou can Jump+CTRL for Maximum Vertical.\n\nControls\n\nF2 - Thirdperson\nV(On ground)- Receive (Can Hold for Higher receive)\nV(On air) - Feint\nL.Click - Spike (Power Does nothing)\nQ - Soft Block")
-		elseif character == "nishinoya" then	
-			character_control:SetText("Yu Nishinoya\n\nAble to do High Receive to let setter do mind game better\n\nControls\n\nF2 - Thirdperson\nV - Receive (Can Hold for Higher receive)\nC - Set (Hold for more Power)\nQ - Short Dive/LongDive\nRules: You cannot set to player after 3 meter line/10ft line.")	
-		elseif character == "bokuto" then 
-			character_control:SetText("Kotaro Bokuto\n\nAble to do cut spike.\nYou can Jump+CTRL for Maximum Vertical.\n\nControls\n\nF2 - Thirdperson\n(Static Serve) - R.Click\nV(On ground)- Receive (Can Hold for Higher receive)\nV(On air) - Feint\nL.Click - Spike (Power Does nothing)\nR - Left Cut\nT - Right Cut\nQ - Soft Block")
-		elseif character == "korai" then 
-			character_control:SetText("How to use Hoshiumi Korai:\nAcquire some distance and Sprint (SHIFT) for 0.5 seconds. \nhen indicator is shown, press SPACEBAR+CTRL to Jump the highest. His reacch can go up to 400cm+!!\n\nOther ability:\nFront Set\nJump Serve")		
-		end 
-	end 
-end)
-
 
 function ClearHooks() 
 	hook.Remove( "Tick", "Bokuto_Cut", function() end)
