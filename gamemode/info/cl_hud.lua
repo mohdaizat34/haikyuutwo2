@@ -62,6 +62,7 @@ local rules = {
     "4. ACTION MODE: SPIKE allows the player to spike the ball while airborne, but disables BLOCK and SET.",
     "5. ACTION MODE: BLOCK allows the player to block while airborne and enables SET.",
     "6. ACTION MODE: Can't be switched while airborne or approaching",
+    "7. BALL LAND PREDICTOR: Can be toggled ON/OFF in settings (N key)",
 }
 
 for _, ruleText in ipairs(rules) do
@@ -103,7 +104,6 @@ local controls = {
     "[KEY_4] - Set Action Mode: BLOCK / SET",
 
     -- Character / Team
-    "[F1] - Character Controls",
     "[KEY_M] - Change Character / Switch Team",
 
     -- Communication / Emotes
