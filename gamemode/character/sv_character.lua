@@ -30,7 +30,7 @@ function CharStats(ply,runspeed,jump)
 	ply:SetHealth(5000) 
 	ply:SetRunSpeed(runspeed) 
 	ply:SetJumpPower(jump) 
-	ply:SetWalkSpeed(160)
+	ply:SetWalkSpeed(runspeed)
 	--ply:SetModel("models/player/summermilitary/male_02.mdl")  
 end 
 

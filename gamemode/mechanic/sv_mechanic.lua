@@ -110,6 +110,7 @@ net.Receive("create_wall",function(bits,ply)
 	local blocker = ents.Create( "prop_dynamic" )
 	local blockerMedium = ents.Create( "prop_dynamic" )
 	local blockerTsuki = ents.Create( "prop_dynamic" )
+	local blockerTsuki2 = ents.Create( "prop_dynamic" )
 	local blockerKuro = ents.Create( "prop_dynamic" )
 
 	local position = net.ReadString()  
@@ -118,10 +119,11 @@ net.Receive("create_wall",function(bits,ply)
 	local default_block = net.ReadBool() 
 
 	print("char:"..character)
-    blocker:SetModel( "models/props/court/blockpanel_s.mdl" )
-	blockerMedium:SetModel( "models/props/court/blockpanel_medium.mdl" ) 
-	blockerTsuki:SetModel( "models/props/court/blockpanel_m.mdl" )
-	blockerKuro:SetModel( "models/props/court/blockpanel_medium.mdl" )
+	blocker:SetModel( "models/props/court/blockpanel_s.mdl" )
+	blockerMedium:SetModel( "models/props/court/blockpanel_medium.mdl" )
+	blockerTsuki:SetModel( "models/props/court/blockpanel_s.mdl" )
+	blockerTsuki2:SetModel( "models/props/court/blockpanel_s.mdl" )
+	blockerKuro:SetModel( "models/props/court/blockpanel_s.mdl" )
     -- blocker2:SetModel( "models/props_debris/metal_panel01a.mdl" )
     -- tsukiBlock:SetModel( "models/props_debris/metal_panel01a.mdl" )
 
@@ -144,6 +146,7 @@ net.Receive("create_wall",function(bits,ply)
 	blocker:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	blockerMedium:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	blockerTsuki:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+	blockerTsuki2:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	blockerKuro:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	
 ----------DEFAULT (Q) BLOCK ------------------------------------------------------------------------
@@ -178,15 +181,26 @@ net.Receive("create_wall",function(bits,ply)
 	angle.y = angle.y + 180 -- Rotate by 180 degrees along the Y-axis
 
 	--if default_block == true then 
-	if position == "left" then 
-		if character == "tsukishima" then 
+	if position == "left" then
+		if character == "tsukishima" then
+			local blockerTsukiLeft = blockerPosition + right * 15
+			local blockerTsukiRight = blockerPosition - right * 15
+
 			blockerTsuki:SetMaterial( "models/wireframe" )
-			blockerTsuki:SetPos(blockerPosition)
-			blockerTsuki:SetAngles(angle) -- Set the angles based on the player's forward vector
+			blockerTsuki:SetPos(blockerTsukiLeft)
+			blockerTsuki:SetAngles(angle)
 			blockerTsuki:SetSolid(SOLID_VPHYSICS)
 			blockerTsuki:Spawn()
 			blockerTsuki:SetNoDraw(false)
-			cooldown = true 
+
+			blockerTsuki2:SetMaterial( "models/wireframe" )
+			blockerTsuki2:SetPos(blockerTsukiRight)
+			blockerTsuki2:SetAngles(angle)
+			blockerTsuki2:SetSolid(SOLID_VPHYSICS)
+			blockerTsuki2:Spawn()
+			blockerTsuki2:SetNoDraw(false)
+
+			cooldown = true
 		elseif character == "kuro" then
 			if tsuki_direction == "block_right" then 
 				angleKuro.r = -5 -- Set roll (side tilt) to 45 degrees
@@ -224,16 +238,27 @@ net.Receive("create_wall",function(bits,ply)
 			blocker:SetNoDraw(false)
 			cooldown = true 
 		end 
-	else 
-		if character == "tsukishima" then 
+	else
+		if character == "tsukishima" then
+			local blockerTsukiLeft = blockerPosition + right * 15
+			local blockerTsukiRight = blockerPosition - right * 15
+
 			blockerTsuki:SetMaterial( "models/wireframe" )
-			blockerTsuki:SetPos(blockerPosition)
-			blockerTsuki:SetAngles(angle) -- Set the angles based on the player's forward vector
+			blockerTsuki:SetPos(blockerTsukiLeft)
+			blockerTsuki:SetAngles(angle)
 			blockerTsuki:SetSolid(SOLID_VPHYSICS)
 			blockerTsuki:Spawn()
 			blockerTsuki:SetNoDraw(false)
-			cooldown = true 
-		elseif character == "kuro" then 
+
+			blockerTsuki2:SetMaterial( "models/wireframe" )
+			blockerTsuki2:SetPos(blockerTsukiRight)
+			blockerTsuki2:SetAngles(angle)
+			blockerTsuki2:SetSolid(SOLID_VPHYSICS)
+			blockerTsuki2:Spawn()
+			blockerTsuki2:SetNoDraw(false)
+
+			cooldown = true
+		elseif character == "kuro" then
 			if tsuki_direction == "block_right" then 
 				angleKuro.r = -5
 				blockerKuro:SetMaterial( "models/wireframe" )
@@ -271,7 +296,7 @@ net.Receive("create_wall",function(bits,ply)
 			cooldown = true 
 		end 
 	end 
-	timer.Simple( 0.6, function() cooldown = false  blockerTsuki:Remove() blockerKuro:Remove()  blocker:Remove() blockerMedium:Remove() end )
+	timer.Simple( 0.8, function() cooldown = false  blockerTsuki:Remove() blockerTsuki2:Remove() blockerKuro:Remove()  blocker:Remove() blockerMedium:Remove() end )
 
 end)
 
@@ -314,6 +339,7 @@ net.Receive ("spike_power_hinata" , function(bits , ply )
 
 
 	if power == "weak" then 
+		ply:EmitSound("spike.mp3", 70, 100, 1, CHAN_AUTO ) 
 		SpikePosition(entityBall,ply,position,700,0,entityPosVect,allow_spike_assist)  
 	else 
 		
@@ -341,7 +367,7 @@ function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_
     net.Start("PlayerAimPrediction")
     net.WriteString(ply:Nick())
     net.WriteVector(ply:GetPos())
-    net.WriteAngle(ply:EyeAngles())
+    net.WriteBool(true) -- isSpike = true
     net.Broadcast()
 
     v:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
@@ -679,7 +705,7 @@ function ReceivePosition(v, vPos, ply, position, power, arc, allow_receive_assis
         if allow_delay then
             if not isReceived then
                 isReceived = true
-                timer.Simple(0.5, function() isReceived = false end)
+                timer.Simple(1, function() isReceived = false end)
                 ply:EmitSound("receive.mp3", 70, 100, 1, CHAN_AUTO)
                 applyVelocity(power, arc)
                 if allow_receive_assist then v:SetPos(newPosition) end

@@ -203,8 +203,35 @@ end
 function GM:PlayerInitialSpawn(ply)
 
 end 
+
+function DefaultSwichMode() 
+	actionMode.block = false
+	actionMode.spike = true
+
+	hook.Remove("PlayerButtonDown", "BlockJumpSystem")
+	hook.Remove("PlayerButtonDown", "KeyDown_Block")
+	SpikeApproachAnimation()
+	SpikePower(spikePower.force,spikePower.power)
+
+	-- Show spike mode notification
+	actionModeNotification.show = true
+	actionModeNotification.text = "SPIKE MODE"
+	actionModeNotification.color = Color(255, 165, 0) -- Orange
+	actionModeNotification.startTime = CurTime()
+
+end 
+function SwitchActionMode()
 -- Think hook for switching modes (available immediately on spawn)
-hook.Add("Think", "SwitchActionMode", function()
+
+	hook.Add("CreateMove", "DisableDefaultJump", function(cmd)
+		if LocalPlayer():IsValid() then
+			cmd:RemoveKey(IN_JUMP)
+		end
+	end)
+
+	DefaultSwichMode()
+
+	hook.Add("Think", "SwitchActionMode", function()
 	ply = LocalPlayer()
 	if not IsValid(ply) then return end
 	-- Don't allow mode switch if player is mid-air or during approach animation
@@ -251,7 +278,8 @@ hook.Add("Think", "SwitchActionMode", function()
 		keyDown[KEY_4] = false
 	end
 
-end)
+	end)
+end 
 
 -- HUD notice
 -- Create a custom bold font
@@ -796,7 +824,8 @@ function ReceiveSendToServer(powertype,ent,allow_old_mechanic, zoneText)
 	net.SendToServer()
 end
 
-function TossSendToServer(powertype,frontback)  
+function TossSendToServer(powertype,frontback) 
+	LocalPlayer():ConCommand("pac_event toss")
 	if ply:GetPos():WithinAABox( pos1, pos2 ) then
 		position = "left"
 	else 
@@ -851,7 +880,7 @@ function GetLagAdjustedDelay(baseDelay)
     if not IsValid(ply) then return baseDelay end
 
     local ping = ply:Ping() / 1000
-    return math.max(0.1, baseDelay - ping)
+    return math.max(0.05, baseDelay - ping)
 end
 
 
@@ -958,45 +987,47 @@ local BACK_TOSS_SET_FORCE = 0
 --------------------------------------------------
 -- HUD VISUAL (LOW / MID / HIGH)
 --------------------------------------------------
-hook.Add("HUDPaint", "KageQuickTossHUD", function()
-    if not KageToss.holding then return end
-    if KAGE_SET_FORCE <= 0 then return end
+function KageQuickTossHUD() 
+	hook.Add("HUDPaint", "KageQuickTossHUD", function()
+		if not KageToss.holding then return end
+		if KAGE_SET_FORCE <= 0 then return end
 
-    local w, h = 320, 36
-    local x = ScrW() / 2 - w / 2
-    local y = ScrH() * 0.65
+		local w, h = 320, 36
+		local x = ScrW() / 2 - w / 2
+		local y = ScrH() * 0.65
 
-    -- Background
-    draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
+		-- Background
+		draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
 
-    -- Fill %
-    local pct = math.Clamp(KageToss.power / 20, 0, 1)
-    local fillW = w * pct
+		-- Fill %
+		local pct = math.Clamp(KageToss.power / 20, 0, 1)
+		local fillW = w * pct
 
-    local col = Color(120, 200, 255)
-    local label = "LOW POWER"
+		local col = Color(120, 200, 255)
+		local label = "LOW POWER"
 
-    if KageToss.power >= KAGE_SET_FORCE then
-        col = Color(120, 255, 120)
-        label = "MID POWER"
-    end
-    if KageToss.power >= 20 then
-        col = Color(255, 120, 120)
-        label = "HIGH POWER"
-    end
+		if KageToss.power >= KAGE_SET_FORCE then
+			col = Color(120, 255, 120)
+			label = "MID POWER"
+		end
+		if KageToss.power >= 20 then
+			col = Color(255, 120, 120)
+			label = "HIGH POWER"
+		end
 
-    draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
+		draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
 
-    draw.SimpleText(
-        label,
-        "Trebuchet24",
-        x + w / 2,
-        y + h / 2,
-        color_white,
-        TEXT_ALIGN_CENTER,
-        TEXT_ALIGN_CENTER
-    )
-end)
+		draw.SimpleText(
+			label,
+			"Trebuchet24",
+			x + w / 2,
+			y + h / 2,
+			color_white,
+			TEXT_ALIGN_CENTER,
+			TEXT_ALIGN_CENTER
+		)
+	end)
+end 
 
 --------------------------------------------------
 -- MAIN FUNCTION (LOGIC UNCHANGED)
@@ -1070,45 +1101,47 @@ local KageFrontTossState = {
 --------------------------------------------------
 -- HUD VISUAL (LOW / MID / HIGH) for KageFrontToss
 --------------------------------------------------
-hook.Add("HUDPaint", "KageFrontTossHUD", function()
-    if not KageFrontTossState.holding then return end
-    if KAGE_SET_FORCE <= 0 then return end
+function KageFrontTossHUD()
+	hook.Add("HUDPaint", "KageFrontTossHUD", function()
+		if not KageFrontTossState.holding then return end
+		if KAGE_SET_FORCE <= 0 then return end
 
-    local w, h = 320, 36
-    local x = ScrW() / 2 - w / 2
-    local y = ScrH() * 0.65
+		local w, h = 320, 36
+		local x = ScrW() / 2 - w / 2
+		local y = ScrH() * 0.65
 
-    -- Background
-    draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
+		-- Background
+		draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
 
-    -- Fill %
-    local pct = math.Clamp(KageFrontTossState.power / 20, 0, 1)
-    local fillW = w * pct
+		-- Fill %
+		local pct = math.Clamp(KageFrontTossState.power / 20, 0, 1)
+		local fillW = w * pct
 
-    local col = Color(120, 200, 255)
-    local label = "LOW POWER"
+		local col = Color(120, 200, 255)
+		local label = "LOW POWER"
 
-    if KageFrontTossState.power >= KAGE_SET_FORCE then
-        col = Color(120, 255, 120)
-        label = "MID POWER"
-    end
-    if KageFrontTossState.power >= 20 then
-        col = Color(255, 120, 120)
-        label = "HIGH POWER"
-    end
+		if KageFrontTossState.power >= KAGE_SET_FORCE then
+			col = Color(120, 255, 120)
+			label = "MID POWER"
+		end
+		if KageFrontTossState.power >= 20 then
+			col = Color(255, 120, 120)
+			label = "HIGH POWER"
+		end
 
-   draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
+	draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
 
-    draw.SimpleText(
-        label,
-        "Trebuchet24",
-        x + w / 2,
-        y + h / 2,
-        color_white,
-        TEXT_ALIGN_CENTER,
-        TEXT_ALIGN_CENTER
-    )
-end)
+		draw.SimpleText(
+			label,
+			"Trebuchet24",
+			x + w / 2,
+			y + h / 2,
+			color_white,
+			TEXT_ALIGN_CENTER,
+			TEXT_ALIGN_CENTER
+		)
+	end)
+end 
 
 function KageFrontToss(setForce)
     -- safety
@@ -1452,6 +1485,7 @@ function BokutoSpike(setForce)
 		if !ply:IsOnGround()  then
 			if release_ball_spike == false then 
 				if (input.IsButtonDown(keySettingR)) then
+					local detection_sqr = 115*115
 					local ent =  ents.FindByClass( "prop_physics*" )
 					for k, v in pairs( ent ) do
 						local toBall = ent[k]:GetPos() - ply:EyePos()
@@ -2067,78 +2101,95 @@ end
 
 
 
--- =========================
--- BLOCK STATE
--- =========================
-default_block = false
+default_block = false 
+blocking = false  
 local isBlocking = false
-local lastJump = false
 
--- =========================
--- KEY SETUP
--- =========================
-local function GetBlockKey()
-    return allow_left_assist and KEY_P or KEY_Q
-end
+function BlockSystem() 
+	hook.Add("PlayerButtonDown","KeyDown_Block",function(ply,button)	
 
--- =========================
--- JUMP DETECTION + BLOCK
--- =========================
-hook.Add("CreateMove", "JumpTriggeredBlock", function(cmd)
-    local ply = LocalPlayer()
-    if not IsValid(ply) then return end
+		local keySetting 
+		if allow_left_assist == false then
+			keySetting = KEY_Q
+		else 
+			keySetting = KEY_P
+		end
+		
+		if button == keySetting then
+			
+			if blocking == true then
+			
+			else 
+				ply:ConCommand("pac_event block")
+				blocking = true  
+				timer.Simple(1,function() blocking = false end)
 
-    local isJumpingNow = cmd:KeyDown(IN_JUMP)
-
-    -- Detect jump press (rising edge)
-    if isJumpingNow and not lastJump then
-
-        local blockKey = GetBlockKey()
-
-        -- Q must be held WHEN jumping
-        if input.IsKeyDown(blockKey) and not isBlocking then
-            isBlocking = true
-            default_block = true
-
-            ply:ConCommand("pac_event block")
-
-            -- Only block when airborne (after jump starts)
-            timer.Simple(0, function()
-                if not IsValid(ply) or ply:IsOnGround() then return end
-
-                -- DEFAULT BLOCK (Q)
-                if ply:GetPos():WithinAABox(pos1, pos2) then
-                    net.Start("create_wall")
-                    net.WriteString("left")
-                    net.WriteString("default")
-                    net.WriteString(character)
-                    net.WriteBool(default_block)
-                    net.SendToServer()
-
-                elseif ply:GetPos():WithinAABox(pos3, pos4) then
-                    net.Start("create_wall")
-                    net.WriteString("right")
-                    net.WriteString("default")
-                    net.WriteString(character)
-                    net.WriteBool(default_block)
-                    net.SendToServer()
-                end
-            end)
-
-            timer.Simple(0.5, function() 
-                isBlocking = false
-            end)
-        end
-    end
-
-    lastJump = isJumpingNow
-end)
+				default_block = true 
+			
+				print("char:"..character)
+			
+				ply:ConCommand("pac_event block") 
+				if !ply:IsOnGround() and isBlocking == false then 
+					if ply:GetPos():WithinAABox( pos1, pos2 ) then
+						isBlocking = true 
+						net.Start("create_wall")
+						net.WriteString("left")
+						net.WriteString("default")
+						net.WriteString(character)
+						net.WriteBool(default_block)
+						net.SendToServer() 
+						timer.Simple(1,function() isBlocking = false end)
+					elseif ply:GetPos():WithinAABox( pos3, pos4 ) then 
+						isBlocking = true 
+						net.Start("create_wall")
+						net.WriteString("right")
+						net.WriteString("default")
+						net.WriteString(character)
+						net.WriteBool(default_block)
+						net.SendToServer() 
+						timer.Simple(1,function() isBlocking = false end)
+					end 
+				end 
+			end 
+		end 
+	
+		if character == "kuro" then 
+			if !actionMode.block then return end 
+			if button == KEY_R then  // when kuro lean left
+				if !ply:IsOnGround() and isBlocking == false then
+					isBlocking = true 
+					ply:ConCommand("pac_event blockleft")
+					net.Start("create_wall")
+					net.WriteString("left")
+					net.WriteString("block_left")
+					net.WriteString("kuro")
+					net.WriteBool(default_block)
+					net.SendToServer() 
+					timer.Simple(1,function() isBlocking = false end)
+				end 
+			elseif button == KEY_T then // when kuro lean right
+				if !ply:IsOnGround() and isBlocking == false then
+					isBlocking = true 
+					ply:ConCommand("pac_event blockright")
+					net.Start("create_wall")
+					net.WriteString("right")
+					net.WriteString("block_right")
+					net.WriteString("kuro")
+					net.WriteBool(default_block)
+					net.SendToServer() 
+					timer.Simple(1,function() isBlocking = false end)
+				end 
+			end 
+		end 
+	end)
+end 	
 
 -- =========================
 -- KURO LEAN BLOCKS (AIR ONLY)
 -- =========================
 hook.Add("PlayerButtonDown", "KuroLeanBlock", function(ply, button)
     if character ~= "kuro" then return end
+    if not actionMode.block then return end
     if ply:IsOnGround() then return end
     if isBlocking then return end
 
@@ -2291,19 +2342,13 @@ activateNoJumpBoost = false
 
 //Jump system
 -- disable jump 
-timer.Simple(1,function() 
-	hook.Add("CreateMove", "DisableDefaultJump", function(cmd)
-		if LocalPlayer():IsValid() then
-			cmd:RemoveKey(IN_JUMP)
-		end
-	end)
-end)
+
 
 function SpikeApproachAnimation()
     local ply = LocalPlayer()
     local realDelay = 0.7
     local ping = ply:Ping() / 1000
-    adjustedDelay = math.max(0.1, realDelay - ping)
+    adjustedDelay = math.max(0.05, realDelay - ping)
     
     -- Remove any previous jump hooks
     hook.Remove("PlayerButtonDown", "BlockJumpSystem")
@@ -2353,7 +2398,7 @@ end
 
 function BlockApproachAnimation()
     local ply = LocalPlayer()
-    local realDelay = 0.1
+    local realDelay = 0.3
     local ping = ply:Ping() / 1000
     adjustedDelay = math.max(0.05, realDelay - ping)
     

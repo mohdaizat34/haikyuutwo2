@@ -1397,8 +1397,9 @@ function ClearHooks()
 	hook.Remove("PlayerButtonDown","KeyDown_Block",function(ply,button) end)
 	hook.Remove("PlayerButtonDown","basic_serve_once",function(ply,button) end)
 
-	// mode system 
+	// mode system KageFrontTossHUD
 	hook.Remove("HUDPaint", "KageQuickTossHUD",function() end)
+	hook.Remove("HUDPaint", "KageFrontTossHUD",function() end)
 
 end
 

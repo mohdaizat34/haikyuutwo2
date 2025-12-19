@@ -685,9 +685,9 @@ net.Receive ("toss_power" , function(bits , ply )
 	for k, v in pairs( ent ) do    
 
 		if frontback == "front" then
-			ply:ConCommand("pac_event set")  
+			ply:ConCommand("pac_event toss")  
 			if ply:GetPos():DistToSqr( v:GetPos() ) < 120*120 then  
-				ply:ConCommand("pac_event set") 
+				ply:ConCommand("pac_event toss") 
 				ply:ConCommand("pac_event jumpset")  
 				ply:SetLagCompensated(true)
 				ply:LagCompensation( true ) 
