@@ -99,7 +99,7 @@ function CreateCharacterSelectMenu()
     frame:SetTitle("Character Selection")
     frame:SetSize(ScrW(), ScrH())
     frame:Center()
-    frame:ShowCloseButton(false)
+    frame:ShowCloseButton(true)
     frame:MakePopup()
     frame.Paint = function( self, w, h ) -- 'function Frame:Paint( w, h )' works too
         draw.RoundedBox( 0, 0, 0, w, h, Color( 255,255,255,0) ) -- Draw a black box instead of the frame

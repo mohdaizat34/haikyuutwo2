@@ -94,18 +94,18 @@ local actionModeNotification = {
     duration = 1.5
 }
 
--- Ball landing prediction after receive/spike
-local ballLandingPrediction = {
+-- Player aim prediction after spike
+local playerAimPrediction = {
     active = false,
-    ballEntity = nil,
+    playerPos = nil,
+    playerAng = nil,
     startTime = 0,
     duration = 1.0,
-    playerName = "",
-    isSpike = false
+    playerName = ""
 }
 
--- Global predictions from all players
-local globalBallPredictions = {}
+-- Global aim predictions from all players
+local globalPlayerAims = {}
 
 spikePower = {
     force = 0,
@@ -288,7 +288,7 @@ hook.Add("HUDPaint", "ActionModeUI", function()
     if not IsValid(ply) then return end
 
     local w, h = 150, 60                 -- panel size
-    local x, y = ScrW() - w - 30, ScrH() - h - 30 -- bottom-right padding
+     local x, y = ScrW() - w - 30, ScrH() - h - 30  -- bottom-right padding, lowered
 
     -- Background box with subtle shadow
     draw.RoundedBox(8, x+2, y+2, w, h, Color(0, 0, 0, 150))  -- shadow
@@ -656,19 +656,19 @@ net.Receive("illusion_effect", function(bits, ply)
 	//LastSpikeClient(playerNick,ballEnt,ballPos,playerEnt)
 end)
 
--- Receive ball landing predictions from other players
-net.Receive("BallLandingPrediction", function()
+-- Receive player aim predictions from other players
+net.Receive("PlayerAimPrediction", function()
 	local playerName = net.ReadString()
-	local ballEnt = net.ReadEntity()
-	local isSpike = net.ReadBool()
+	local playerPos = net.ReadVector()
+	local playerAng = net.ReadAngle()
 
 	-- Store the prediction for this player
-	globalBallPredictions[playerName] = {
+	globalPlayerAims[playerName] = {
 		active = true,
-		ballEntity = ballEnt,
+		playerPos = playerPos,
+		playerAng = playerAng,
 		startTime = CurTime(),
-		duration = 1.0,
-		isSpike = isSpike
+		duration = 1.0
 	}
 end)
 
@@ -679,12 +679,12 @@ function SpikeSendToServer(powertype,spikepower,entity,entityPos,allow_spike_ass
 		position = "right"
 	end
 
-	-- Activate ball landing prediction after spike
-	ballLandingPrediction.active = true
-	ballLandingPrediction.ballEntity = entity
-	ballLandingPrediction.startTime = CurTime()
-	ballLandingPrediction.playerName = ply:Nick()
-	ballLandingPrediction.isSpike = true
+	-- Activate player aim prediction after spike - capture current aim direction
+	playerAimPrediction.active = true
+	playerAimPrediction.playerPos = ply:EyePos() -- Use eye position for accurate aim line start
+	playerAimPrediction.playerAng = ply:EyeAngles() -- This captures where they're looking when hitting the ball
+	playerAimPrediction.startTime = CurTime()
+	playerAimPrediction.playerName = ply:Nick()
 
 	net.Start("spike_power_hinata")
 	net.WriteString(position)
@@ -1775,9 +1775,10 @@ function ReceivePower()
     local ply = LocalPlayer()
     local keySetting = allow_left_assist and KEY_APOSTROPHE or KEY_V
     local hasSent = false
+    local lastReceiveTime = 0
 
   	local PERFECT_DIST_SQR = 30*30  -- ~30 units
-	local BAD_DIST_SQR     = 70*70  -- ~70 units  
+	local BAD_DIST_SQR     = 70*70  -- ~70 units
 	local MAX_DIST_SQR     = 100*100 -- ~100 units max detection
 
     -- Determine zone text based on distance
@@ -1822,8 +1823,8 @@ function ReceivePower()
                 end
                 action_status = zoneText
 
-                -- Send to server once when detected within range
-                if not hasSent then
+                -- Send to server once when detected within range and cooldown passed
+                if not hasSent and CurTime() - lastReceiveTime > 0.5 then
                     local sendType = GetSendType()
                     ReceiveSendToServer(sendType, closestEnt, false, zoneText)
 
@@ -1834,8 +1835,7 @@ function ReceivePower()
                     end
 
                     hasSent = true
-                end
-
+				end
                 -- Optional: visual feedback for current position
                 debugoverlay.Sphere(closestEnt:GetPos(), 10, 0.1, zoneText == "Perfect Receive" and Color(0,255,0) or Color(255,200,0), true)
             else
@@ -1927,9 +1927,7 @@ function TossPower(setForce)
 			TossPowerState.power = powertoss
 
 		else
-			if buttonpresstoss == 0 then
-
-			elseif buttonpresstoss == 1 then
+			if buttonpresstoss == 1 then
 				buttonpresstoss = 0
 				TossPowerState.holding = false
 
@@ -2069,87 +2067,112 @@ end
 
 
 
-default_block = false 
-blocking = false  
+-- =========================
+-- BLOCK STATE
+-- =========================
+default_block = false
 local isBlocking = false
+local lastJump = false
 
-function BlockSystem() 
-	hook.Add("PlayerButtonDown","KeyDown_Block",function(ply,button)	
+-- =========================
+-- KEY SETUP
+-- =========================
+local function GetBlockKey()
+    return allow_left_assist and KEY_P or KEY_Q
+end
 
-		local keySetting 
-		if allow_left_assist == false then
-			keySetting = KEY_Q
-		else 
-			keySetting = KEY_P
-		end
-		
-		if button == keySetting then
-			
-			if blocking == true then
-			
-			else 
-				ply:ConCommand("pac_event block")
-				blocking = true  
-				timer.Simple(1,function() blocking = false end)
+-- =========================
+-- JUMP DETECTION + BLOCK
+-- =========================
+hook.Add("CreateMove", "JumpTriggeredBlock", function(cmd)
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
 
-				default_block = true 
-			
-				print("char:"..character)
-			
-				ply:ConCommand("pac_event block") 
-				if !ply:IsOnGround() and isBlocking == false then 
-					if ply:GetPos():WithinAABox( pos1, pos2 ) then
-						isBlocking = true 
-						net.Start("create_wall")
-						net.WriteString("left")
-						net.WriteString("default")
-						net.WriteString(character)
-						net.WriteBool(default_block)
-						net.SendToServer() 
-						timer.Simple(1,function() isBlocking = false end)
-					elseif ply:GetPos():WithinAABox( pos3, pos4 ) then 
-						isBlocking = true 
-						net.Start("create_wall")
-						net.WriteString("right")
-						net.WriteString("default")
-						net.WriteString(character)
-						net.WriteBool(default_block)
-						net.SendToServer() 
-						timer.Simple(1,function() isBlocking = false end)
-					end 
-				end 
-			end 
-		end 
-	
-		if character == "kuro" then 
-			if button == KEY_R then  // when kuro lean left
-				if !ply:IsOnGround() and isBlocking == false then
-					isBlocking = true 
-					ply:ConCommand("pac_event blockleft")
-					net.Start("create_wall")
-					net.WriteString("left")
-					net.WriteString("block_left")
-					net.WriteString("kuro")
-					net.WriteBool(default_block)
-					net.SendToServer() 
-					timer.Simple(1,function() isBlocking = false end)
-				end 
-			elseif button == KEY_T then // when kuro lean right
-				if !ply:IsOnGround() and isBlocking == false then
-					isBlocking = true 
-					ply:ConCommand("pac_event blockright")
-					net.Start("create_wall")
-					net.WriteString("right")
-					net.WriteString("block_right")
-					net.WriteString("kuro")
-					net.WriteBool(default_block)
-					net.SendToServer() 
-					timer.Simple(1,function() isBlocking = false end)
-				end 
-			end 
-		end 
-	end)
-end 	
+    local isJumpingNow = cmd:KeyDown(IN_JUMP)
+
+    -- Detect jump press (rising edge)
+    if isJumpingNow and not lastJump then
+
+        local blockKey = GetBlockKey()
+
+        -- Q must be held WHEN jumping
+        if input.IsKeyDown(blockKey) and not isBlocking then
+            isBlocking = true
+            default_block = true
+
+            ply:ConCommand("pac_event block")
+
+            -- Only block when airborne (after jump starts)
+            timer.Simple(0, function()
+                if not IsValid(ply) or ply:IsOnGround() then return end
+
+                -- DEFAULT BLOCK (Q)
+                if ply:GetPos():WithinAABox(pos1, pos2) then
+                    net.Start("create_wall")
+                    net.WriteString("left")
+                    net.WriteString("default")
+                    net.WriteString(character)
+                    net.WriteBool(default_block)
+                    net.SendToServer()
+
+                elseif ply:GetPos():WithinAABox(pos3, pos4) then
+                    net.Start("create_wall")
+                    net.WriteString("right")
+                    net.WriteString("default")
+                    net.WriteString(character)
+                    net.WriteBool(default_block)
+                    net.SendToServer()
+                end
+            end)
+
+            timer.Simple(0.5, function() 
+                isBlocking = false
+            end)
+        end
+    end
+
+    lastJump = isJumpingNow
+end)
+
+-- =========================
+-- KURO LEAN BLOCKS (AIR ONLY)
+-- =========================
+hook.Add("PlayerButtonDown", "KuroLeanBlock", function(ply, button)
+    if character ~= "kuro" then return end
+    if ply:IsOnGround() then return end
+    if isBlocking then return end
+
+    if button == KEY_R then
+        isBlocking = true
+        default_block = false
+
+        ply:ConCommand("pac_event blockleft")
+
+        net.Start("create_wall")
+        net.WriteString("left")
+        net.WriteString("block_left")
+        net.WriteString("kuro")
+        net.WriteBool(default_block)
+        net.SendToServer()
+
+    elseif button == KEY_T then
+        isBlocking = true
+        default_block = false
+
+        ply:ConCommand("pac_event blockright")
+
+        net.Start("create_wall")
+        net.WriteString("right")
+        net.WriteString("block_right")
+        net.WriteString("kuro")
+        net.WriteBool(default_block)
+        net.SendToServer()
+    end
+
+    timer.Simple(1, function()
+        isBlocking = false
+    end)
+end)
 
 function DivePower(setForce)
 	ply = LocalPlayer() 
@@ -2330,9 +2353,9 @@ end
 
 function BlockApproachAnimation()
     local ply = LocalPlayer()
-    local realDelay = 0.3
+    local realDelay = 0.1
     local ping = ply:Ping() / 1000
-    adjustedDelay = math.max(0.1, realDelay - ping)
+    adjustedDelay = math.max(0.05, realDelay - ping)
     
     -- Remove any previous jump hooks
     hook.Remove("PlayerButtonDown", "SpikeJumpSystem")
@@ -2484,70 +2507,73 @@ hook.Add("HUDPaint", "ActionModeSwitchNotification", function()
     draw.SimpleText(actionModeNotification.text, font, x, y, Color(actionModeNotification.color.r, actionModeNotification.color.g, actionModeNotification.color.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
--- Ball landing prediction HUD after spike only
-hook.Add("HUDPaint", "BallLandingPredictionHUD", function()
-    -- Check if ball prediction is enabled in settings
+-- Player aim prediction HUD after spike
+hook.Add("HUDPaint", "PlayerAimPredictionHUD", function()
+    -- Check if ball prediction is enabled in settings (keeping same setting name)
     if not allow_ball_prediction then return end
 
-    -- Draw local spike prediction
-    if ballLandingPrediction.active and ballLandingPrediction.isSpike then
+    -- Draw local player aim prediction
+    if playerAimPrediction.active then
         -- Check if prediction should still be active
-        local elapsed = CurTime() - ballLandingPrediction.startTime
-        if elapsed > ballLandingPrediction.duration then
-            ballLandingPrediction.active = false
+        local elapsed = CurTime() - playerAimPrediction.startTime
+        if elapsed > playerAimPrediction.duration then
+            playerAimPrediction.active = false
         else
             -- Calculate fade alpha
             local alpha = 255
-            if elapsed > ballLandingPrediction.duration * 0.7 then
-                alpha = 255 * (1 - (elapsed - ballLandingPrediction.duration * 0.7) / (ballLandingPrediction.duration * 0.3))
+            if elapsed > playerAimPrediction.duration * 0.7 then
+                alpha = 255 * (1 - (elapsed - playerAimPrediction.duration * 0.7) / (playerAimPrediction.duration * 0.3))
             end
 
-            -- Check if ball entity is still valid
-            if IsValid(ballLandingPrediction.ballEntity) then
-                -- Get predicted landing position
-                local landingPos = GetBallLandingPos(ballLandingPrediction.ballEntity)
-                if landingPos then
-                    -- Convert 3D world position to 2D screen position
-                    local screenPos = landingPos:ToScreen()
-                    if screenPos.visible then
-                        -- Get ball's current screen position
-                        local ballScreenPos = ballLandingPrediction.ballEntity:GetPos():ToScreen()
-                        if ballScreenPos.visible then
-                            -- Draw trajectory line from ball to landing spot
-                            surface.SetDrawColor(255, 165, 0, alpha)
-                            surface.DrawLine(ballScreenPos.x, ballScreenPos.y, screenPos.x, screenPos.y)
-                        end
+            -- Draw aim line from player eye position in eye direction, traced to hit point
+            local startPos = playerAimPrediction.playerPos
+            local aimDir = playerAimPrediction.playerAng:Forward()
 
-                        -- Draw prediction circle (orange for spike)
-                        local color = Color(255, 165, 0)
-                        local radius = 25
-                        local x, y = screenPos.x, screenPos.y
+            -- Trace line of sight
+            local trace = util.TraceLine({
+                start = startPos,
+                endpos = startPos + aimDir * 1000, -- Long trace
+                filter = LocalPlayer(),
+                mask = MASK_SOLID
+            })
 
-                        -- Draw outer glow
-                        for i = 1, 3 do
-                            draw.RoundedBox(radius + i * 2, x - (radius + i * 2) / 2, y - (radius + i * 2) / 2, radius + i * 4, radius + i * 4, Color(color.r, color.g, color.b, alpha * 0.3 / i))
-                        end
+            local endPos = trace.HitPos
 
-                        -- Draw main circle
-                        draw.RoundedBox(radius, x - radius / 2, y - radius / 2, radius, radius, Color(color.r, color.g, color.b, alpha))
+            -- Convert to screen positions
+            local startScreen = startPos:ToScreen()
+            local endScreen = endPos:ToScreen()
 
-                        -- Draw center dot
-                        draw.RoundedBox(4, x - 2, y - 2, 4, 4, Color(255, 255, 255, alpha))
-                    end
+            if startScreen.visible or endScreen.visible then
+                -- Draw aim line (orange)
+                surface.SetDrawColor(255, 165, 0, alpha)
+                surface.DrawLine(startScreen.x, startScreen.y, endScreen.x, endScreen.y)
+
+                -- Draw small circle at end of aim line
+                local color = Color(255, 165, 0)
+                local radius = 8
+                local x, y = endScreen.x, endScreen.y
+
+                -- Draw outer glow
+                for i = 1, 2 do
+                    draw.RoundedBox(radius + i * 1, x - (radius + i * 1) / 2, y - (radius + i * 1) / 2, radius + i * 2, radius + i * 2, Color(color.r, color.g, color.b, alpha * 0.4 / i))
                 end
-            else
-                ballLandingPrediction.active = false
+
+                -- Draw main circle
+                draw.RoundedBox(radius, x - radius / 2, y - radius / 2, radius, radius, Color(color.r, color.g, color.b, alpha))
+
+                -- Draw center dot
+                draw.RoundedBox(2, x - 1, y - 1, 2, 2, Color(255, 255, 255, alpha))
             end
         end
     end
 
-    -- Draw global spike predictions from other players
-    for playerName, prediction in pairs(globalBallPredictions) do
-        if prediction.active and prediction.isSpike then
+    -- Draw global player aim predictions from other players
+    for playerName, prediction in pairs(globalPlayerAims) do
+        if prediction.active then
             -- Check if prediction should still be active
             local elapsed = CurTime() - prediction.startTime
             if elapsed > prediction.duration then
-                globalBallPredictions[playerName] = nil
+                globalPlayerAims[playerName] = nil
             else
                 -- Calculate fade alpha
                 local alpha = 255
@@ -2555,41 +2581,44 @@ hook.Add("HUDPaint", "BallLandingPredictionHUD", function()
                     alpha = 255 * (1 - (elapsed - prediction.duration * 0.7) / (prediction.duration * 0.3))
                 end
 
-                -- Check if ball entity is still valid
-                if IsValid(prediction.ballEntity) then
-                    -- Get predicted landing position
-                    local landingPos = GetBallLandingPos(prediction.ballEntity)
-                    if landingPos then
-                        -- Convert 3D world position to 2D screen position
-                        local screenPos = landingPos:ToScreen()
-                        if screenPos.visible then
-                            -- Get ball's current screen position
-                            local ballScreenPos = prediction.ballEntity:GetPos():ToScreen()
-                            if ballScreenPos.visible then
-                                -- Draw trajectory line from ball to landing spot
-                                surface.SetDrawColor(255, 165, 0, alpha)
-                                surface.DrawLine(ballScreenPos.x, ballScreenPos.y, screenPos.x, screenPos.y)
-                            end
+                -- Draw aim line from player eye position in eye direction, traced to hit point
+                local startPos = prediction.playerPos
+                local aimDir = prediction.playerAng:Forward()
 
-                            -- Draw prediction circle (orange for spike)
-                            local color = Color(255, 165, 0)
-                            local radius = 20 -- Slightly smaller for global predictions
-                            local x, y = screenPos.x, screenPos.y
+                -- Trace line of sight
+                local trace = util.TraceLine({
+                    start = startPos,
+                    endpos = startPos + aimDir * 1000, -- Long trace
+                    filter = LocalPlayer(),
+                    mask = MASK_SOLID
+                })
 
-                            -- Draw outer glow
-                            for i = 1, 2 do
-                                draw.RoundedBox(radius + i * 2, x - (radius + i * 2) / 2, y - (radius + i * 2) / 2, radius + i * 4, radius + i * 4, Color(color.r, color.g, color.b, alpha * 0.2 / i))
-                            end
+                local endPos = trace.HitPos
 
-                            -- Draw main circle
-                            draw.RoundedBox(radius, x - radius / 2, y - radius / 2, radius, radius, Color(color.r, color.g, color.b, alpha))
+                -- Convert to screen positions
+                local startScreen = startPos:ToScreen()
+                local endScreen = endPos:ToScreen()
 
-                            -- Draw center dot
-                            draw.RoundedBox(3, x - 1.5, y - 1.5, 3, 3, Color(255, 255, 255, alpha))
-                        end
+                if startScreen.visible or endScreen.visible then
+                    -- Draw aim line (orange, slightly more transparent for global)
+                    surface.SetDrawColor(255, 165, 0, alpha * 0.8)
+                    surface.DrawLine(startScreen.x, startScreen.y, endScreen.x, endScreen.y)
+
+                    -- Draw small circle at end of aim line
+                    local color = Color(255, 165, 0)
+                    local radius = 6 -- Smaller for global predictions
+                    local x, y = endScreen.x, endScreen.y
+
+                    -- Draw outer glow
+                    for i = 1, 2 do
+                        draw.RoundedBox(radius + i * 1, x - (radius + i * 1) / 2, y - (radius + i * 1) / 2, radius + i * 2, radius + i * 2, Color(color.r, color.g, color.b, alpha * 0.3 / i))
                     end
-                else
-                    globalBallPredictions[playerName] = nil
+
+                    -- Draw main circle
+                    draw.RoundedBox(radius, x - radius / 2, y - radius / 2, radius, radius, Color(color.r, color.g, color.b, alpha))
+
+                    -- Draw center dot
+                    draw.RoundedBox(1.5, x - 0.75, y - 0.75, 1.5, 1.5, Color(255, 255, 255, alpha))
                 end
             end
         end

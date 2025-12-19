@@ -5,7 +5,7 @@ allow_spike_assist = true
 allow_left_assist = false
 allow_old_receive = false
 allow_warmup = false
-allow_ball_prediction = true -- Ball landing prediction toggle
+allow_ball_prediction = false -- Ball landing prediction toggle
 
 local frameIsOpen = false 
 local PANEL = {}

@@ -1398,7 +1398,7 @@ function ClearHooks()
 	hook.Remove("PlayerButtonDown","basic_serve_once",function(ply,button) end)
 
 	// mode system 
-	
+	hook.Remove("HUDPaint", "KageQuickTossHUD",function() end)
 
 end
 

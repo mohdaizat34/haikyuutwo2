@@ -31,8 +31,8 @@ util.AddNetworkString("BallHitGround")
 -- collide
 util.AddNetworkString("get_collide_info")
 util.AddNetworkString("PrintEveryone")
--- ball landing prediction
-util.AddNetworkString("BallLandingPrediction")
+-- player aim prediction
+util.AddNetworkString("PlayerAimPrediction")
 
 --Jump System
 util.AddNetworkString("addVelocity")
@@ -148,8 +148,8 @@ net.Receive("create_wall",function(bits,ply)
 	
 ----------DEFAULT (Q) BLOCK ------------------------------------------------------------------------
 	local forward = ply:GetForward()
-	local blockerPosition = ply:GetPos() + forward * 50 -- Adjust the distance as needed
-	blockerPosition.z = blockerPosition.z + 100 -- Adjust the height as needed
+	local blockerPosition = ply:GetPos() + forward * 45 -- Adjust the distance as needed
+	blockerPosition.z = 120 -- Adjust the height as needed
 
 	
 	
@@ -161,10 +161,10 @@ net.Receive("create_wall",function(bits,ply)
 	local heightOffset = 95     -- Adjust the height as needed
 	
 	local blockerPositionKuroRight = ply:GetPos() + ply:GetForward() * distanceForward + right * distanceRight
-	blockerPositionKuroRight.z = blockerPositionKuroRight.z + 100 -- Adjust the height as needed
+	blockerPositionKuroRight.z = blockerPositionKuroRight.z + 80 -- Adjust the height as needed
 
 	local blockerPositionKuroLeft = ply:GetPos() + ply:GetForward() * distanceForward - right * distanceRight
-	blockerPositionKuroLeft.z = blockerPositionKuroLeft.z + 100 -- Adjust the height as needed
+	blockerPositionKuroLeft.z = blockerPositionKuroLeft.z + 80 -- Adjust the height as needed
 
 	local angleKuro = ply:GetAngles()
     angleKuro.p = angleKuro.p - 15 -- Set pitch (up/down tilt) to 45 degrees
@@ -271,7 +271,7 @@ net.Receive("create_wall",function(bits,ply)
 			cooldown = true 
 		end 
 	end 
-	timer.Simple( 1.2, function() cooldown = false  blockerTsuki:Remove() blockerKuro:Remove()  blocker:Remove() blockerMedium:Remove() end )
+	timer.Simple( 0.6, function() cooldown = false  blockerTsuki:Remove() blockerKuro:Remove()  blocker:Remove() blockerMedium:Remove() end )
 
 end)
 
@@ -337,11 +337,11 @@ randomSoundHinata = {"hina/hinataspike2.mp3","hina/hinataspike3.mp3"}
 randomSoundKorai = {"korai/hoshiumispike1.wav","korai/hoshiumispike2.wav"} 
 		
 function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_assist)
-    -- Broadcast ball landing prediction to all clients
-    net.Start("BallLandingPrediction")
+    -- Broadcast player aim prediction to all clients
+    net.Start("PlayerAimPrediction")
     net.WriteString(ply:Nick())
-    net.WriteEntity(v)
-    net.WriteBool(true) -- isSpike = true
+    net.WriteVector(ply:GetPos())
+    net.WriteAngle(ply:EyeAngles())
     net.Broadcast()
 
     v:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
