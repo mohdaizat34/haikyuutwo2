@@ -1015,6 +1015,8 @@ function KageQuickToss(setForce)
     hook.Remove("Tick", "Kage_toss2")
 
     hook.Add("Tick", "Kage_toss2", function()
+        if not actionMode.block then return end
+
         if input.IsButtonDown(MOUSE_MIDDLE) then
             KageToss.holding = true
 
@@ -1119,6 +1121,7 @@ function KageFrontToss(setForce)
     hook.Remove("Tick", "Kage_toss")
 
     hook.Add("Tick", "Kage_toss", function()
+        if not actionMode.block then return end
 
         local keySetting
         if allow_left_assist == false then
@@ -1911,6 +1914,8 @@ function TossPower(setForce)
 
 
 	hook.Add( "Tick", "KeyDown_Toss", function()
+		if not actionMode.block then return end
+
 		local keySetting = MOUSE_LEFT
 
 		if (input.IsButtonDown(keySetting)) then
