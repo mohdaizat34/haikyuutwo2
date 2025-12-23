@@ -132,7 +132,7 @@ function MenuFrame()
 	MainFrame:SetTitle("This gamemode is created by Hope")
 	MainFrame:SetVisible(true) 
 	MainFrame:SetBackgroundBlur( true )
-	MainFrame:ShowCloseButton(true)
+	MainFrame:ShowCloseButton(false)
 	MainFrame:Center()
 	MainFrame:MakePopup(true)
 	MainFrame.Paint = function( self, w, h ) -- 'function Frame:Paint( w, h )' works too
