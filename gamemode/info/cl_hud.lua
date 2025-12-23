@@ -353,10 +353,23 @@ function DrawAdminIndicator(ply,char)
 	local pos = Vector(x,y,z+zOffset)	
 	local pos2d = pos:ToScreen()
 
+    local name = ply:Nick()
+    local color = team.GetColor( ply:Team() )
 
-    draw.DrawText(ply:Nick(),"Default",pos2d.x,pos2d.y, team.GetColor( ply:Team() ),TEXT_ALIGN_CENTER)
+    if ply:Ping() >= 150 then
+        surface.SetFont("Default")
+        local nameWidth = surface.GetTextSize(name)
+        local lagText = " (LAG)"
+        local lagWidth = surface.GetTextSize(lagText)
+        local totalWidth = nameWidth + lagWidth
+        local nameX = pos2d.x - totalWidth/2 + nameWidth/2
+        local lagX = pos2d.x - totalWidth/2 + nameWidth + lagWidth/2
+        draw.DrawText(name,"Default",nameX,pos2d.y, color,TEXT_ALIGN_CENTER)
+        draw.DrawText(lagText,"Default",lagX,pos2d.y, Color(255,0,0),TEXT_ALIGN_CENTER)
+    else
+        draw.DrawText(name,"Default",pos2d.x,pos2d.y, color,TEXT_ALIGN_CENTER)
+    end
 
-	
 	--end
 end
 

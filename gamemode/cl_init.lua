@@ -1661,32 +1661,4 @@ hook.Add("PostDrawTranslucentRenderables", "RenderSingleArc", function()
     end
 end)
 
--- Trigger the arc once
-hook.Add("Think", "TriggerOneTimeArc", function()
-    if input.IsKeyDown(KEY_C) and not arcTriggered then
-        -- Lock the trigger
-        arcTriggered = true
 
-        -- Get the starting position slightly above the player
-        local startPos = LocalPlayer():GetPos() + Vector(0, 0, 50)
-
-        -- Define a fixed forward direction and target position
-        local forward = LocalPlayer():GetForward() * 300 -- Fixed distance in front
-        local targetPos = startPos + forward -- Consistent arc target position
-
-        -- Define arc properties
-        local arcHeight = 100 -- Fixed consistent height
-        local segments = 20 -- Number of points for smoothness
-
-        -- Set arc data for rendering
-        arcData = {
-            startPos = startPos,
-            targetPos = targetPos,
-            arcHeight = arcHeight,
-            segments = segments,
-            expiryTime = CurTime() + arcLifetime -- Time when the arc will disappear
-        }
-
-        print("Arc triggered from " .. tostring(startPos) .. " to " .. tostring(targetPos))
-    end
-end)

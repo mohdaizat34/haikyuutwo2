@@ -1,4 +1,5 @@
 action_status = ""
+local groundHitTimer = nil
 
 print("Mechanic")
 hook.Remove( "Tick", "KeyDown_Testis", function() end)
@@ -77,6 +78,10 @@ pos2 = Vector(  -556.752686, 324.668060, 218.018539)
 -- Calculate the mirrored positions for the right side with reduced width
 pos3 = Vector(pos1.x, -pos1.y, pos1.z)
 pos4 = Vector(pos2.x,319.357361, pos2.z)
+
+-- Court boundaries for IN/OUT detection
+court_min = Vector(800.388855, -32.057045, -55.968750)
+court_max = Vector(1199.963135, 671.806091, -55.968750)
 
 position = ""
 // added on 2025/12/13
@@ -632,6 +637,22 @@ function LastSpikeClient(playerNick,ball,ballPos,playerEnt)
 end 
 
 local clones = ClientsideModel("models/pejal_models/volleyball/mikasa.mdl") 
+local BALL_RADIUS = 0
+
+hook.Add("InitPostEntity", "CalcBallRadius", function()
+    local temp = ClientsideModel("models/pejal_models/volleyball/mikasa.mdl")
+    if not IsValid(temp) then return end
+
+    local mins, maxs = temp:GetModelBounds()
+    BALL_RADIUS = math.max(
+        math.abs(mins.x), math.abs(maxs.x),
+        math.abs(mins.y), math.abs(maxs.y)
+    )
+
+    temp:Remove()
+end)
+
+
 -- Function to create a visual marker at the position of the entity
 function CreateGroundMarker(pos,ball)
 	 
@@ -664,14 +685,37 @@ function CreateGroundMarker(pos,ball)
 	end)
 end
 
--- mark effect 
-net.Receive("BallHitGroundClient", function(bits, ply)
-	local ballPos = net.ReadVector() 
-	local ballEnt = net.ReadEntity() 
-	
-	--print("Bro ?")
-	CreateGroundMarker(ballPos,ballEnt)
-end) 
+courtMin = Vector(794.318298, -40.005096, -100)
+courtMax = Vector(1207.460327, 676.799255, 100)
+
+ function IsBallInCourt(ballPos)
+    if not isvector(ballPos) then return false end
+
+    -- Expand court by ball radius
+    local min = courtMin
+    local max = courtMax 
+
+    return ballPos:WithinAABox(min, max)
+end
+
+
+-- global state
+isBallIn = nil
+
+net.Receive("BallHitGroundClient", function()
+    local ballPos = net.ReadVector()
+    local ballEnt = net.ReadEntity()
+
+    isBallIn = IsBallInCourt(ballPos)
+	CreateGroundMarker(ballPos, isBallIn)
+
+    print(isBallIn and "BALL IN" or "BALL OUT")
+	timer.Simple(0.8,function()	surface.PlaySound("whistle.mp3") end)
+
+    groundHitTimer = CurTime() + 3.5
+end)
+
+
 
 -- illusion effect
 net.Receive("illusion_effect", function(bits, ply)
@@ -729,6 +773,7 @@ end
 --- RECEIVE MECHANICS START --------------------------------
 isReceived = false
 function ReceiveSendToServer(powertype,ent,allow_old_mechanic, zoneText)
+	groundHitTimer = nil
 	chat.AddText("receive accuracy:", zoneText)
 
 	if ply:GetPos():WithinAABox( pos1, pos2 ) then
@@ -824,13 +869,14 @@ function ReceiveSendToServer(powertype,ent,allow_old_mechanic, zoneText)
 	net.SendToServer()
 end
 
-function TossSendToServer(powertype,frontback) 
+function TossSendToServer(powertype,frontback)
+	groundHitTimer = nil
 	LocalPlayer():ConCommand("pac_event toss")
 	if ply:GetPos():WithinAABox( pos1, pos2 ) then
 		position = "left"
-	else 
+	else
 		position = "right"
-	end 
+	end
 	net.Start("toss_power")
 	net.WriteString(position)
 	net.WriteString(powertype)
@@ -838,7 +884,7 @@ function TossSendToServer(powertype,frontback)
 	net.WriteBool(allow_set_assist)
 	net.SendToServer()
 
-	
+
 end
 
 
@@ -2670,10 +2716,75 @@ hook.Add("HUDPaint", "PlayerAimPredictionHUD", function()
     end
 end)
 
+//ball mark  <-- reference
+hook.Add("HUDPaint", "GroundHitNotification", function()
+    if not groundHitTimer or isBallIn == nil then return end
+
+    local elapsed = CurTime() - (groundHitTimer - 3.5)
+
+    if elapsed < 0.7 then
+        local time = math.floor(elapsed * 10) / 10
+        draw.SimpleText(tostring(time), "Trebuchet24",
+            ScrW()/2, ScrH()*0.1,
+            Color(255,255,0),
+            TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP
+        )
+        return
+    end
+
+    if elapsed < 3.5 then
+        local groundText  = isBallIn and "IN" or "OUT"
+        local groundColor = isBallIn and Color(0,255,0) or Color(255,0,0)
+
+        local mat = Material("referee.png")
+        surface.SetMaterial(mat)
+        surface.SetDrawColor(255,255,255,255)
+
+        local imgW, imgH = 128, 128
+        local y = ScrH() * 0.1 - imgH / 2
+
+        surface.DrawTexturedRect(
+            ScrW()/2 - imgW - 10,
+            y,
+            imgW,
+            imgH
+        )
+
+        draw.SimpleText(
+            groundText,
+            "Trebuchet24",
+            ScrW()/2 + 10,
+            ScrH()*0.1,
+            groundColor,
+            TEXT_ALIGN_LEFT,
+            TEXT_ALIGN_TOP
+        )
+    end
+end)
+
+
 -- Initialize spike mode functions
 timer.Simple(3,function()
 	SpikeApproachAnimation()
 end)
+
+
+hook.Add("PlayerButtonDown", "GetAimPosOnC", function(ply, button)
+    if ply ~= LocalPlayer() then return end
+    if button ~= KEY_C then return end
+
+    local tr = util.TraceLine({
+        start  = ply:EyePos(),
+        endpos = ply:EyePos() + ply:EyeAngles():Forward() * 10000,
+        filter = ply
+    })
+
+    print("Aim world position:", tr.HitPos)
+end)
+
+//first pos  1199.963135 -32.057045 -55.968750
+// second pos 800.388855 671.806091 -55.968750
+
 
 
 
@@ -2726,4 +2837,5 @@ end)
 --     else
 --         LocalPlayer().keyRWasDown = false
 --     end
+-- end)
 -- end)
