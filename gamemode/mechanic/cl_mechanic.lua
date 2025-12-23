@@ -710,7 +710,9 @@ net.Receive("BallHitGroundClient", function()
 	CreateGroundMarker(ballPos, isBallIn)
 
     print(isBallIn and "BALL IN" or "BALL OUT")
-	timer.Simple(0.8,function()	surface.PlaySound("whistle.mp3") end)
+	if allow_in_out_system then
+		timer.Simple(0.8,function()	surface.PlaySound("whistle.mp3") end)
+	end
 
     groundHitTimer = CurTime() + 3.5
 end)
@@ -2718,7 +2720,7 @@ end)
 
 //ball mark  <-- reference
 hook.Add("HUDPaint", "GroundHitNotification", function()
-    if not groundHitTimer or isBallIn == nil then return end
+    if not allow_in_out_system or not groundHitTimer or isBallIn == nil then return end
 
     local elapsed = CurTime() - (groundHitTimer - 3.5)
 
