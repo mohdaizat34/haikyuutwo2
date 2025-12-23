@@ -91,7 +91,9 @@ end
 -- Function to create the character selection menu
 function CreateCharacterSelectMenu()
 
-    menuOpen = true 
+    menuOpen = true
+
+    surface.PlaySound("haikyuu.mp3")
 
     //surface.PlaySound("engine2.mp3")
     -- Create the main frame
@@ -101,6 +103,10 @@ function CreateCharacterSelectMenu()
     frame:Center()
     frame:ShowCloseButton(true)
     frame:MakePopup()
+    frame.OnClose = function()
+        LocalPlayer():ConCommand("stopsound")
+        menuOpen = false
+    end
     frame.Paint = function( self, w, h ) -- 'function Frame:Paint( w, h )' works too
         draw.RoundedBox( 0, 0, 0, w, h, Color( 255,255,255,0) ) -- Draw a black box instead of the frame
     end

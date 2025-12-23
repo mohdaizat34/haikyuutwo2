@@ -6,6 +6,7 @@ allow_left_assist = false
 allow_old_receive = false
 allow_warmup = false
 allow_ball_prediction = false -- Ball landing prediction toggle
+allow_in_out_system = true -- IN/OUT referee system toggle
 
 local frameIsOpen = false 
 local PANEL = {}
@@ -110,12 +111,13 @@ function PANEL:Init()
         local btnYes = togglePanel.btnYes
         btnYes:SetSize(180, 40)
         btnYes:SetPos(20, 5)
+        btnYes:SetTextColor(textColor)
         btnYes:SetText(yesText)
         btnYes:SetFont("Trebuchet18")
         btnYes.selected = defaultYes
         btnYes.Paint = function(self, w, h)
             local bgColor = self.selected and Color(50, 150, 50, 200) or Color(60, 60, 70, 150)
-            local textColor = self.selected and Color(255, 255, 255) or Color(180, 180, 180)
+            local textColor = Color(255, 255, 255)
             draw.RoundedBox(8, 0, 0, w, h, bgColor)
             draw.SimpleText(self:GetText(), "Trebuchet18", w/2, h/2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
@@ -129,12 +131,13 @@ function PANEL:Init()
         local btnNo = togglePanel.btnNo
         btnNo:SetSize(180, 40)
         btnNo:SetPos(220, 5)
+        btnNo:SetTextColor(textColor)
         btnNo:SetText(noText)
         btnNo:SetFont("Trebuchet18")
         btnNo.selected = not defaultYes
         btnNo.Paint = function(self, w, h)
             local bgColor = self.selected and Color(150, 50, 50, 200) or Color(60, 60, 70, 150)
-            local textColor = self.selected and Color(255, 255, 255) or Color(180, 180, 180)
+            local textColor = Color(255, 255, 255)
             draw.RoundedBox(8, 0, 0, w, h, bgColor)
             draw.SimpleText(self:GetText(), "Trebuchet18", w/2, h/2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
@@ -206,6 +209,23 @@ function PANEL:Init()
             chat.AddText(Color(200, 50, 50), "✗ Ball Landing Prediction: HIDDEN")
         end,
         allow_ball_prediction
+    )
+    yOffset = yOffset + 70
+
+    -- IN/OUT System Section
+    CreateSettingSection("Referee System", "Show referee calls and whistle", "")
+
+    -- IN/OUT System
+    CreateToggleButtons(yOffset, "ENABLED", "DISABLED",
+        function()
+            allow_in_out_system = true
+            chat.AddText(Color(50, 200, 50), "✓ IN/OUT System: ENABLED")
+        end,
+        function()
+            allow_in_out_system = false
+            chat.AddText(Color(200, 50, 50), "✗ IN/OUT System: DISABLED")
+        end,
+        allow_in_out_system
     )
     yOffset = yOffset + 70
 
