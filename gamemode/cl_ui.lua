@@ -93,7 +93,7 @@ function CreateCharacterSelectMenu()
 
     menuOpen = true
 
-    surface.PlaySound("haikyuu.mp3")
+    surface.PlaySound("inventorymusic.mp3")
 
     //surface.PlaySound("engine2.mp3")
     -- Create the main frame

@@ -148,6 +148,28 @@ net.Receive("create_wall",function(bits,ply)
 	blockerTsuki:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	blockerTsuki2:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 	blockerKuro:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+
+	-- Tag blockers for collision detection and store creator
+	local creatorTeam = ply:Team()
+	blocker:SetName("kabe")
+	blocker:SetNWInt("BlockCreatorTeam", creatorTeam)
+	blocker:SetNWString("BlockCreator", ply:Nick())
+
+	blockerMedium:SetName("kabe")
+	blockerMedium:SetNWInt("BlockCreatorTeam", creatorTeam)
+	blockerMedium:SetNWString("BlockCreator", ply:Nick())
+
+	blockerTsuki:SetName("kabe")
+	blockerTsuki:SetNWInt("BlockCreatorTeam", creatorTeam)
+	blockerTsuki:SetNWString("BlockCreator", ply:Nick())
+
+	blockerTsuki2:SetName("kabe")
+	blockerTsuki2:SetNWInt("BlockCreatorTeam", creatorTeam)
+	blockerTsuki2:SetNWString("BlockCreator", ply:Nick())
+
+	blockerKuro:SetName("kabe")
+	blockerKuro:SetNWInt("BlockCreatorTeam", creatorTeam)
+	blockerKuro:SetNWString("BlockCreator", ply:Nick())
 	
 ----------DEFAULT (Q) BLOCK ------------------------------------------------------------------------
 	local forward = ply:GetForward()
@@ -709,21 +731,26 @@ function ReceivePosition(v, vPos, ply, position, power, arc, allow_receive_assis
                 ply:EmitSound("receive.mp3", 70, 100, 1, CHAN_AUTO)
                 applyVelocity(power, arc)
                 if allow_receive_assist then v:SetPos(newPosition) end
+                print("Receive applied with delay - power:", power, "arc:", arc)
             end
         else
             ply:EmitSound("receive.mp3", 70, 100, 1, CHAN_AUTO)
             applyVelocity(power, arc)
             if allow_receive_assist then v:SetPos(newPosition) end
+            print("Receive applied - power:", power, "arc:", arc)
         end
     end
 
-    -- Determine team zone checks
+    -- Area check: prevent receiving balls over other team area
     local inOtherTeamArea = false
+
     if position == "left" then
-        inOtherTeamArea = v:GetPos():WithinAABox(pos3, pos4)
-        if inOtherTeamArea then ply:ChatPrint("Can't receive ball over other team area! code 2") end
-    else
+        -- Left team can't receive balls in right team area (pos1-pos2)
         inOtherTeamArea = v:GetPos():WithinAABox(pos1, pos2)
+        if inOtherTeamArea then ply:ChatPrint("Can't receive ball over other team area! code 2 hahah") end
+    else
+        -- Right team can't receive balls in left team area (pos3-pos4)
+        inOtherTeamArea = v:GetPos():WithinAABox(pos3, pos4)
         if inOtherTeamArea then ply:ChatPrint("Can't receive ball over other team area! code 1") end
     end
 
@@ -1568,7 +1595,7 @@ net.Receive("addVelocity", function(len, ply)
 	ply:SetVelocity(Vector(0, 0, jumpPower))
 	
 	if char == "korai" then 
-		//ply:EmitSound("npc/zombie/zombie_pound_door.wav")
+		ply:EmitSound("korai/highjump1.wav") 
 	end 
     
 end)
@@ -1594,6 +1621,87 @@ hook.Add("SetupMove", "DelayedJump_SlowMovement", function(ply, mv, cmd)
     -- Reduce speed while jump is charging
     mv:SetMaxSpeed(100)
     mv:SetMaxClientSpeed(100)
+end)
+
+-- Automatic block detection system
+local lastBlockTime = 0
+
+-- Add collision detection to volleyball when it's created
+hook.Add("OnEntityCreated", "SetupVolleyballCollision", function(ent)
+    if not IsValid(ent) then return end
+    if ent:GetClass() ~= "prop_physics" then return end
+
+    -- Wait a bit for the entity to be fully initialized
+    timer.Simple(0.1, function()
+        if not IsValid(ent) then return end
+
+        -- Check if this is a volleyball (any volleyball entity)
+        if string.find(ent:GetName(), "volleyball") then
+            -- Add collision callback to the volleyball
+            ent:AddCallback("PhysicsCollide", function(ent, data)
+                local hitEnt = data.HitEntity
+                if IsValid(hitEnt) and hitEnt:GetName() == "kabe" then
+                    -- Prevent spam by checking time since last block
+                    if CurTime() - lastBlockTime > 1.0 then
+                        local blockerTeam = hitEnt:GetNWInt("BlockCreatorTeam", 0)
+                        local blockerName = hitEnt:GetNWString("BlockCreator", "Unknown")
+
+                        -- Debug prints
+                        print("Block collision detected!")
+                        print("Blocker Team NWVar:", hitEnt:GetNWInt("BlockCreatorTeam", -999))
+                        print("Blocker Name NWVar:", hitEnt:GetNWString("BlockCreator", "NOT_SET"))
+
+                        PrintMessage(HUD_PRINTTALK, "BLOCK TOUCH by " .. blockerName .. " (Team " .. blockerTeam .. ")!")
+
+                        -- Award point to the blocking team
+                        if blockerTeam == 1 then
+                            -- Award point to Blue team
+
+                        elseif blockerTeam == 2 then
+
+                        lastBlockTime = CurTime()
+                    end
+                end
+            end)
+        end
+    end)
+end)
+
+-- Test command to create a dummy block wall for testing collision
+concommand.Add("test_block_wall", function(ply)
+    if not IsValid(ply) then return end
+
+    -- Create a test block panel in front of the player
+    local blocker = ents.Create("prop_dynamic")
+    blocker:SetModel("models/props/court/blockpanel_s.mdl")
+    blocker:SetPos(ply:GetPos() + ply:GetForward() * 100 + Vector(0, 0, 50))
+    blocker:SetAngles(ply:GetAngles())
+    blocker:SetName("kabe") -- Tag it for collision detection
+    blocker:SetMaterial("models/wireframe") -- Make it visible
+    blocker:SetSolid(SOLID_VPHYSICS)
+
+    -- Set creator information BEFORE spawning
+    local creatorTeam = ply:Team()
+    blocker:SetNWInt("BlockCreatorTeam", creatorTeam)
+    blocker:SetNWString("BlockCreator", ply:Nick())
+
+    blocker:Spawn()
+
+    -- Verify the values after spawning
+    timer.Simple(0.1, function()
+        if IsValid(blocker) then
+            print("Block wall spawned - Team:", blocker:GetNWInt("BlockCreatorTeam", -1), "Name:", blocker:GetNWString("BlockCreator", "NOT_SET"))
+        end
+    end)
+
+    -- Remove after 30 seconds
+    timer.Simple(30, function()
+        if IsValid(blocker) then
+            blocker:Remove()
+        end
+    end)
+
+    ply:ChatPrint("Test block wall created! Check console for debug info.")
 end)
 --[[
 net.Receive("predictBall",function(bits,ply) 

@@ -70,3 +70,118 @@ hook.Add("HUDPaint", "DistanceBarHUD", function()
 
     draw.SimpleText(zoneText, "DermaDefaultBold", x + barWidth/2, y - 20, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
+
+-- BASIC - Advanced ReceivePower function
+function ReceivePower()
+    local ply = LocalPlayer()
+    local keySetting = allow_left_assist and KEY_APOSTROPHE or KEY_V
+    local hasSent = false
+    local lastReceiveTime = 0
+
+  	local PERFECT_DIST_SQR = 30*30  -- ~30 units
+	local BAD_DIST_SQR     = 70*70  -- ~70 units
+	local MAX_DIST_SQR     = 100*100 -- ~100 units max detection
+
+    -- Determine zone text based on distance
+    local function GetZoneText(distSqr)
+        if distSqr <= PERFECT_DIST_SQR then return "Perfect Receive"
+        elseif distSqr <= BAD_DIST_SQR then return "Bad Receive"
+        else return "Out of Reach" end
+    end
+
+    local function GetSendType()
+        if character == "kuro" or character == "kenma" then
+            return string.lower(set_power_level_receive_special)
+        else
+            return string.lower(set_power_level_receive)
+        end
+    end
+
+    hook.Add("Tick", "ReceivePower_HoldDetect", function()
+        if not IsValid(ply) then return end
+        local holding = input.IsButtonDown(keySetting)
+
+        if holding and ply:IsOnGround() then
+            local closestEnt
+            local closestDistSqr = MAX_DIST_SQR
+
+            -- Find closest ball based on current position
+            for _, ent in ipairs(ents.FindByClass("prop_physics*")) do
+                if IsValid(ent) then
+                    local distSqr = ply:GetPos():DistToSqr(ent:GetPos())
+
+                    if distSqr < closestDistSqr then
+                        closestDistSqr = distSqr
+                        closestEnt = ent
+                    end
+                end
+            end
+
+            if IsValid(closestEnt) and closestDistSqr <= MAX_DIST_SQR then
+                local zoneText = GetZoneText(closestDistSqr)
+                if ply:Crouching() then
+                    zoneText = "Perfect Receive"
+                end
+                action_status = zoneText
+
+                -- Send to server once when detected within range and cooldown passed
+                if not hasSent and CurTime() - lastReceiveTime > 0.5 then
+                    local sendType = GetSendType()
+                    ReceiveSendToServer(sendType, closestEnt, false, zoneText)
+
+                    -- PERFECT feedback
+                    if zoneText == "Perfect Receive" then
+                        surface.PlaySound("perfect.mp3")
+                        perfectReceiveStartTime = CurTime()
+                    end
+
+                    hasSent = true
+				end
+                -- Optional: visual feedback for current position
+                debugoverlay.Sphere(closestEnt:GetPos(), 10, 0.1, zoneText == "Perfect Receive" and Color(0,255,0) or Color(255,200,0), true)
+            else
+                action_status = ""
+                hasSent = false
+            end
+        else
+            action_status = ""
+            hasSent = false
+        end
+    end)
+end
+
+--- RECEIVE MECHANICS START --------------------------------
+isReceived = false
+function ReceiveSendToServer(powertype,ent,allow_old_mechanic, zoneText)
+	groundHitTimer = nil
+	chat.AddText("receive accuracy:", zoneText)
+
+	-- Position detection: if in pos1-pos2 area, you're on "right" team, else "left" team
+	if ply:GetPos():WithinAABox( pos1, pos2 ) then
+		position = "right"
+		ply:ConCommand("pac_event receive")
+		print("on right side ")
+		isReceived = true
+	else
+		position = "left"
+		ply:ConCommand("pac_event receive")
+		print("on left side ")
+		isReceived = true
+	end
+
+	if powertype == "feint" then
+		//play feint animation
+		ply:ConCommand("pac_event spike")
+	end
+
+	net.Start("receive_power")
+	net.WriteString(position)
+	net.WriteString(powertype)
+	net.WriteEntity(ent)
+	net.WriteBool(allow_receive_assist)
+	net.WriteVector(ent:GetPos())
+	net.WriteBool(allow_old_mechanic)
+	net.WriteString(character)
+	net.WriteString(zoneText)
+	net.SendToServer()
+end

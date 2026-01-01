@@ -1,17 +1,62 @@
-include("mechanic/receive-system/cl_receive_system.lua") 
-include("mechanic/cl_mechanic.lua") 
+-- ===============================
+-- Shared
+-- ===============================
+include("shared.lua")
+
+-- ===============================
+-- Core
+-- ===============================
+include("font.lua")
+include("cl_ui.lua")
+
+-- ===============================
+-- Info
+-- ===============================
+include("info/cl_animinfo.lua")
+include("info/cl_hud.lua")
+include("info/cl_tutorial.lua")
+
+-- ===============================
+-- Keybinds
+-- ===============================
+include("keybind/cl_keybind.lua")
+
+-- ===============================
+-- Mechanics (core)
+-- ===============================
+include("mechanic/cl_mechanic.lua")
+include("mechanic/cl_communication.lua")
+include("mechanic/cl_setting.lua")
+
+-- Modular mechanics
+include("mechanic/cl_ui_mechanic.lua")
+include("mechanic/cl_action_mode.lua")
+include("mechanic/cl_jump_system.lua")
+include("mechanic/cl_spike_mechanics.lua")
+include("mechanic/cl_toss_mechanics.lua")
+include("mechanic/cl_block_mechanics.lua")
+include("mechanic/cl_hud_elements.lua")
+include("mechanic/cl_net_receives.lua")
+include("mechanic/cl_utilities.lua")
+
+-- ===============================
+-- Receive system
+-- ===============================
+include("mechanic/receive-system/cl_receive_system.lua")
+
+-- ===============================
+-- Characters
+-- ===============================
 include("mechanic/kenma/cl_kenma.lua")
 include("mechanic/sakusa/cl_sakusa.lua")
 include("mechanic/hinata/cl_hinata.lua")
-include("mechanic/cl_communication.lua") 
-include("mechanic/cl_setting.lua")
-include("keybind/cl_keybind.lua") 
-include("info/cl_animinfo.lua") 
-include("info/cl_hud.lua")
-include("font.lua")
-include("info/cl_tutorial.lua")
-include("cl_ui.lua")
+include("mechanic/miya/cl_miya.lua")
+include("mechanic/yamaguchi/cl_yamaguchi.lua")
+include("mechanic/bokuto/cl_bokuto.lua")
 
+-- ===============================
+-- Music
+-- ===============================
 include("musicplayer/cl_music_player.lua")
 
 

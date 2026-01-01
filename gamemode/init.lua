@@ -1,43 +1,71 @@
-AddCSLuaFile("cl_init.lua") 
-AddCSLuaFile("font.lua") 
+-- ===============================
+-- Send core files
+-- ===============================
+AddCSLuaFile("cl_init.lua")
 AddCSLuaFile("shared.lua")
-AddCSLuaFile("cl_keybinds.lua")   
-AddCSLuaFile("cl_spikes.lua")
-AddCSLuaFile("cl_animenerd.lua") 
-AddCSLuaFile("cl_army.lua")   
-AddCSLuaFile("mechanic/receive-system/cl_receive_system.lua") 
-AddCSLuaFile("mechanic/receive-system/sv_receive_system.lua") 
-AddCSLuaFile("mechanic/sv_mechanic.lua") 
-AddCSLuaFile("mechanic/cl_mechanic.lua")
-AddCSLuaFile("mechanic/cl_communication.lua") 
-AddCSLuaFile("mechanic/sv_communication.lua")
-AddCSLuaFile("mechanic/kenma/sv_kenma.lua")
-AddCSLuaFile("mechanic/kenma/cl_kenma.lua")
-AddCSLuaFile("mechanic/sakusa/sv_sakusa.lua") 
-AddCSLuaFile("mechanic/sakusa/cl_sakusa.lua") 
-AddCSLuaFile("mechanic/hinata/cl_hinata.lua")
-AddCSLuaFile("mechanic/hinata/sv_hinata.lua") 
-AddCSLuaFile("mechanic/cl_setting.lua") --setting
-AddCSLuaFile("mechanic/sv_setting.lua") --setting
-AddCSLuaFile("character/sv_character.lua") 
-AddCSLuaFile("info/cl_animinfo.lua") 
+
+-- ===============================
+-- Client-only files
+-- ===============================
+AddCSLuaFile("font.lua")
+AddCSLuaFile("cl_ui.lua")
+
+-- Info
+AddCSLuaFile("info/cl_animinfo.lua")
 AddCSLuaFile("info/cl_hud.lua")
 AddCSLuaFile("info/cl_tutorial.lua")
-AddCSLuaFile("cl_ui.lua")
-AddCSLuaFile("mechanic/sv_npc.lua") 
-AddCSLuaFile("musicplayer/cl_music_player.lua")
-AddCSLuaFile("musicplayer/sv_music_player.lua")
 
-include("mechanic/sv_communication.lua")
-include("mechanic/sv_mechanic.lua")
-include("mechanic/sv_setting.lua") --setting
-include("character/sv_character.lua") 
-include("mechanic/kenma/sv_kenma.lua") 
-include("mechanic/sakusa/sv_sakusa.lua") 
-include("mechanic/hinata/sv_hinata.lua") 
-include("mechanic/sv_npc.lua") 
-include("musicplayer/sv_music_player.lua")
+-- Keybinds
+AddCSLuaFile("keybind/cl_keybind.lua")
+
+-- Mechanics (client)
+AddCSLuaFile("mechanic/cl_mechanic.lua")
+AddCSLuaFile("mechanic/cl_communication.lua")
+AddCSLuaFile("mechanic/cl_setting.lua")
+
+AddCSLuaFile("mechanic/cl_ui_mechanic.lua")
+AddCSLuaFile("mechanic/cl_action_mode.lua")
+AddCSLuaFile("mechanic/cl_jump_system.lua")
+AddCSLuaFile("mechanic/cl_spike_mechanics.lua")
+AddCSLuaFile("mechanic/cl_toss_mechanics.lua")
+AddCSLuaFile("mechanic/cl_block_mechanics.lua")
+AddCSLuaFile("mechanic/cl_hud_elements.lua")
+AddCSLuaFile("mechanic/cl_net_receives.lua")
+AddCSLuaFile("mechanic/cl_utilities.lua")
+
+-- Receive system
+AddCSLuaFile("mechanic/receive-system/cl_receive_system.lua")
+
+-- Characters (client)
+AddCSLuaFile("mechanic/kenma/cl_kenma.lua")
+AddCSLuaFile("mechanic/sakusa/cl_sakusa.lua")
+AddCSLuaFile("mechanic/hinata/cl_hinata.lua")
+AddCSLuaFile("mechanic/miya/cl_miya.lua")
+AddCSLuaFile("mechanic/yamaguchi/cl_yamaguchi.lua")
+AddCSLuaFile("mechanic/bokuto/cl_bokuto.lua")
+
+-- Music
+AddCSLuaFile("musicplayer/cl_music_player.lua")
+
+-- ===============================
+-- Server-only files
+-- ===============================
 include("shared.lua")
+
+include("mechanic/sv_mechanic.lua")
+include("mechanic/sv_communication.lua")
+include("mechanic/sv_setting.lua")
+include("mechanic/sv_npc.lua")
+
+include("mechanic/receive-system/sv_receive_system.lua")
+
+include("mechanic/kenma/sv_kenma.lua")
+include("mechanic/sakusa/sv_sakusa.lua")
+include("mechanic/hinata/sv_hinata.lua")
+
+include("character/sv_character.lua")
+include("musicplayer/sv_music_player.lua")
+
 
 //receive 
 include("mechanic/receive-system/sv_receive_system.lua") 
