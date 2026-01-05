@@ -490,28 +490,21 @@ local characterStats = {
             draw.RoundedBox(0, 0, 0, w, h, Color(0, 80, 240))
         end
 
-        function confirm_button:DoClick() 
-            surface.PlaySound("confirm.mp3")
-            frame:Close() 
-            popupFrame:Close() 
-            menuOpen = false 
-
-            //LocalPlayer():ConCommand("stopsound")
-
-            if character == "hinata" then 
-                SpikerSignal() 
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips") 
+        local function SetupCharacter()
+            if character == "hinata" then
+                SpikerSignal()
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
-                MainFrame2:SetVisible(false) 
+                MainFrame2:SetVisible(false)
                 SwitchActionMode()
                 SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
-                BasicServe() 
+                BasicServe()
                 SpikerSignal()
                 net.Start("character_select")
                 net.WriteString("hinata")
-                net.SendToServer() 
+                net.SendToServer()
 
             elseif character == "kageyama" then
                 chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
@@ -519,14 +512,16 @@ local characterStats = {
                 ClearHooks()
                 KageQuickTossHUD()
                 KageFrontTossHUD()
+                KageKingTossHUD()
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 TossPower(10)
                 BackTossPower(10)
-                KageFrontToss(10)
+                //KageFrontToss(10)
                 KageQuickToss(10)
+                KageKingToss(10)
                 BasicServe()
                 --BlockPower(10)
                 SetterSignal()
@@ -534,69 +529,65 @@ local characterStats = {
                 net.WriteString("kage")
                 net.SendToServer()
 
-            elseif character == "sakusa" then 
-                skill_desc:SetText("Position: Wing Spiker\n\nCapable of curving his spikes with his natural wrist technique.")
+            elseif character == "sakusa" then
                 hook.Remove("PlayerButtonDown","Ref",function(ply,button) end)
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")  
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 SpikerSignal()
-                SakusaAttack(1000) 
+                SakusaAttack(1000)
                 --BlockPower(10)
                 BasicServe()
-            
+
                 net.Start("character_select")
                 net.WriteString("sakusa")
-                net.SendToServer() 
+                net.SendToServer()
 
-            elseif character == "bokuto" then 
-                skill_desc:SetText("Position: Wing Spiker\n\nPhysically strong with the ability to execute powerful cross shots") 
+            elseif character == "bokuto" then
                 hook.Remove("PlayerButtonDown","Ref",function(ply,button) end)
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")  
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 SpikerSignal()
                 ReceivePower(10)
                 BokutoSpike(10)
                 BasicServe()
-            
+
                 net.Start("character_select")
                 net.WriteString("bokuto")
-                net.SendToServer() 
-                
-            elseif character == "kuro" then 
-                skill_desc:SetText("Position: Middle Blocker\n\nAble to lean left or right to cover a larger blocking area when positioned.") 
+                net.SendToServer()
+
+            elseif character == "kuro" then
                 hook.Remove("PlayerButtonDown","Ref",function(ply,button) end)
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")  
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 SpikerSignal()
                 --BlockPower(10)
                 BasicServe()
-                MainFrame2:SetVisible(false) 
-            
+                MainFrame2:SetVisible(false)
+
                 net.Start("character_select")
                 net.WriteString("kuro")
                 net.SendToServer()
 
             elseif character == "miya" then
-                skill_desc:SetText("Position: Setter\n\nA setter who can deliver a powerful jump serve.")
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips") 
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 chat.AddText(Color(188, 66, 245),"You have wider view because you are a setter!\nHold ALT for Setter's Signal")
                 ClearHooks()
                 KageQuickTossHUD()
                 KageFrontTossHUD()
-                MainFrame2:SetVisible(false) 
+                MainFrame2:SetVisible(false)
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 TossPower(10)
@@ -608,16 +599,15 @@ local characterStats = {
                 SetterSignal()
                 net.Start("character_select")
                 net.WriteString("miya")
-                net.SendToServer() 
+                net.SendToServer()
 
-            elseif character == "ushijima" then 
-                skill_desc:SetText("Capable of delivering extraordinary spiking power.") 
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips") 
+            elseif character == "ushijima" then
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
-                MainFrame2:SetVisible(false) 
+                MainFrame2:SetVisible(false)
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
-                SetJumpPowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
+                SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 SpikerSignal()
                 --YamaguchiServe()
@@ -627,16 +617,15 @@ local characterStats = {
                 --BackTossPower(10)
                 net.Start("character_select")
                 net.WriteString("ushi")
-                net.SendToServer() 
+                net.SendToServer()
 
-            elseif character == "yamaguchi" then 
-                skill_desc:SetText("Position: Middle Blocker/Pinch Server\n\nDespite lacking physical attributes, he can execute a float serve that makes the ball's landing unpredictable.")
+            elseif character == "yamaguchi" then
                 hook.Remove("PlayerButtonDown","Ref",function(ply,button) end)
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")  
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
-                MainFrame2:SetVisible(false) 
+                MainFrame2:SetVisible(false)
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 YamaguchiServe()
@@ -647,57 +636,55 @@ local characterStats = {
                 --BackTossPower(10)
                 net.Start("character_select")
                 net.WriteString("yama")
-                net.SendToServer() 
+                net.SendToServer()
 
-            elseif character == "tsukishima" then 
-                skill_desc:SetText("Able to block with an extended coverage area.")
+            elseif character == "tsukishima" then
                 hook.Remove("PlayerButtonDown","Ref",function(ply,button) end)
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")  
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
                 SwitchActionMode()
-                SetSpikePowerByCharacter(character) 
+                SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
                 SpikerSignal()
                 --BlockPower(10)
                 BasicServe()
-                MainFrame2:SetVisible(false) 
-            
+                MainFrame2:SetVisible(false)
+
                 net.Start("character_select")
                 net.WriteString("tsuki")
                 net.SendToServer()
 
-            elseif character == "korai" then 
+            elseif character == "korai" then
                 hook.Remove("PlayerButtonDown","Ref",function(ply,button) end)
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")  
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 ClearHooks()
                 KageFrontTossHUD()
                 SwitchActionMode()
                 SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
                 ReceivePower(10)
-                SpikerSignal() 
+                SpikerSignal()
                 BasicServe()
-                -- ability 
-                //KoraiJumpBoost() 
+                -- ability
+                //KoraiJumpBoost()
                 --MiyaServe()
                 TossPower(10)
-            
-                MainFrame2:SetVisible(false) 
-            
+
+                MainFrame2:SetVisible(false)
+
                 net.Start("character_select")
                 net.WriteString("korai")
-                net.SendToServer() 
+                net.SendToServer()
 
-            elseif character == "kenma" then 
-                skill_desc:SetText("Position: Setter\n\nA calm setter who can effortlessly dump the ball to the left or right whenever needed.")
-                	--CharPosition() 
-                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips") 
+            elseif character == "kenma" then
+                	--CharPosition()
+                chat.AddText(Color(255,0,0),"Press M to change char\nF2 for Thirdperson\nF1 for Character Tips")
                 chat.AddText(Color(188, 66, 245),"You have wider view because you are a setter!")
                 ClearHooks()
                 KageQuickTossHUD()
                 KageFrontTossHUD()
-                MainFrame2:SetVisible(false) 
+                MainFrame2:SetVisible(false)
                 SwitchActionMode()
                 SetSpikePowerByCharacter(character)
                 SetJumpPowerByCharacter(character)
@@ -712,10 +699,77 @@ local characterStats = {
                 SetterSignal()
                 net.Start("character_select")
                 net.WriteString("kenma")
-                net.SendToServer() 
-                
-            end 
-        end 
+                net.SendToServer()
+
+            end
+        end
+
+        function confirm_button:DoClick()
+            surface.PlaySound("confirm.mp3")
+            frame:Close()
+            popupFrame:Close()
+            menuOpen = false
+
+            //LocalPlayer():ConCommand("stopsound")
+
+            -- Check if player already has a team
+            if LocalPlayer():Team() == 1 or LocalPlayer():Team() == 2 then
+                -- Player already has a team, skip team selection
+                SetupCharacter()
+            else
+                -- Create team selection screen
+                local teamPanel = vgui.Create("DPanel")
+                teamPanel:SetSize(ScrW(), ScrH())
+                teamPanel:SetPos(0, 0)
+                teamPanel:SetBackgroundColor(Color(0, 0, 0, 200))
+                teamPanel:MakePopup()
+
+                local teamText = vgui.Create("DLabel", teamPanel)
+                teamText:SetText("Choose Your Team")
+                teamText:SetFont("Trebuchet24")
+                teamText:SetTextColor(Color(255, 255, 255))
+                teamText:SizeToContents()
+                teamText:SetPos((ScrW() - teamText:GetWide()) / 2, ScrH() * 0.3)
+
+                local redButton = vgui.Create("DButton", teamPanel)
+                redButton:SetSize(200, 50)
+                redButton:SetPos(ScrW() / 2 - 250, ScrH() / 2)
+                redButton:SetText("Red Team")
+                redButton:SetFont("Trebuchet24")
+                redButton:SetTextColor(Color(255, 255, 255))
+                redButton.Paint = function(self, w, h)
+                    draw.RoundedBox(8, 0, 0, w, h, Color(255, 0, 0))
+                end
+                redButton.DoClick = function()
+                    teamPanel:Remove()
+                    local team = "red"
+                    net.Start("changeteam")
+                    net.WriteString(team)
+                    net.WriteString(character)
+                    net.SendToServer()
+                    SetupCharacter()
+                end
+
+                local blueButton = vgui.Create("DButton", teamPanel)
+                blueButton:SetSize(200, 50)
+                blueButton:SetPos(ScrW() / 2 + 50, ScrH() / 2)
+                blueButton:SetText("Blue Team")
+                blueButton:SetFont("Trebuchet24")
+                blueButton:SetTextColor(Color(255, 255, 255))
+                blueButton.Paint = function(self, w, h)
+                    draw.RoundedBox(8, 0, 0, w, h, Color(0, 0, 255))
+                end
+                blueButton.DoClick = function()
+                    teamPanel:Remove()
+                    local team = "blue"
+                    net.Start("changeteam")
+                    net.WriteString(team)
+                    net.WriteString(character)
+                    net.SendToServer()
+                    SetupCharacter()
+                end
+            end
+        end
         -- Table that maps each image path to its description
     local characterDescriptions = {
         ["materials/hud/spiker.png"] = "This character excels as an attacker",

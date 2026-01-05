@@ -7,22 +7,28 @@ korai_jump = 350+jumpAdd
 korai_boost_jump = 395+jumpAdd
 
 net.Receive ("changeteam" , function(bits , ply )
-	local teams = net.ReadString() 
-	local character = net.ReadString() 
+	local teams = net.ReadString()
+	local character = net.ReadString()
 
-	for k,v in pairs (player.GetAll()) do 
+	for k,v in pairs (player.GetAll()) do
 		v:ChatPrint(ply:Nick().." has changed to Team "..teams)
-	end 
+	end
+
+	-- Free old position if changing teams
+	FreePlayerPosition(ply)
 
 		--ply:ConCommand("cl_playermodel  ")
-	if teams == "blue" then 
+	if teams == "blue" then
 		ply:SetTeam(1)
 		player_team = team.GetPlayers(ply:Team())
-	else 
+	else
 		ply:SetTeam(2)
 		player_team = team.GetPlayers(ply:Team())
-	end 
-end) 
+	end
+
+	-- Spawn at team position
+	SpawnPlayerAtTeamPosition(ply)
+end)
 
 function CharStats(ply,runspeed,jump)  
 	--ply:ConCommand("pac_wear_parts volleyball")
@@ -152,4 +158,4 @@ net.Receive ("character_select" , function(bits , ply )
 		print(ply:GetModel())
 	end 
 
-end) 
+end)

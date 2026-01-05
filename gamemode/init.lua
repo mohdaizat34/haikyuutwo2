@@ -71,6 +71,7 @@ include("musicplayer/sv_music_player.lua")
 include("mechanic/receive-system/sv_receive_system.lua") 
 
 util.AddNetworkString("random_system")
+util.AddNetworkString("allow_competitive_mode")
 
 GM.Name = "Gmod Volleyball 2.0"
 
@@ -172,6 +173,79 @@ end)
 -- Calculate the mirrored positions for the right side with reduced width
  pos3 = Vector(pos1.x, -pos1.y, pos1.z)
  pos4 = Vector(pos2.x,319.357361, pos2.z)
+
+-- Team spawn positions (6 positions per team within court bounding boxes)
+-- Team 1 (Blue - Top half): y from 318.4 to 676.8, x from 794 to 1207
+TEAM1_POSITIONS = {
+    Vector(1100, 600, 0),  -- Position 1: Back left
+    Vector(1000, 600, 0),  -- Position 2: Back center
+    Vector(900, 600, 0),   -- Position 3: Back right
+    Vector(1100, 400, 0),  -- Position 4: Front left
+    Vector(1000, 400, 0),  -- Position 5: Front center
+    Vector(900, 400, 0)    -- Position 6: Front right
+}
+
+-- Team 2 (Red - Bottom half): y from -40 to 318.4, x from 794 to 1207
+TEAM2_POSITIONS = {
+    Vector(1100, 200, 0),  -- Position 1: Back left (from team perspective)
+    Vector(1000, 200, 0),  -- Position 2: Back center
+    Vector(900, 200, 0),   -- Position 3: Back right
+    Vector(1100, 50, 0),   -- Position 4: Front left
+    Vector(1000, 50, 0),   -- Position 5: Front center
+    Vector(900, 50, 0)     -- Position 6: Front right
+}
+
+-- Track occupied positions: occupiedPositions[team][positionIndex] = player
+occupiedPositions = {}
+
+-- Competitive mode setting (default enabled)
+allow_competitive_mode = true
+
+-- Function to spawn player at first available team position
+function SpawnPlayerAtTeamPosition(ply)
+    local team = ply:Team()
+    if team ~= 1 and team ~= 2 then return end -- Only for teams 1 and 2
+
+    local positions = (team == 1) and TEAM1_POSITIONS or TEAM2_POSITIONS
+
+    -- Initialize team table if needed
+    if not occupiedPositions[team] then
+        occupiedPositions[team] = {}
+    end
+
+    -- Find first available position
+    for i = 1, 6 do
+        if not occupiedPositions[team][i] then
+            occupiedPositions[team][i] = ply
+            ply:SetPos(positions[i])
+            ply:ChatPrint("Spawned at position " .. i .. " on your team.")
+            return true
+        end
+    end
+
+    -- All positions occupied, spawn at default location
+    ply:SetPos(Vector(1000, 0, 100)) -- Default spawn point
+    ply:ChatPrint("All team positions are occupied. Spawned at default location.")
+    return false
+end
+
+-- Function to free player's position
+function FreePlayerPosition(ply)
+    local team = ply:Team()
+    if not occupiedPositions[team] then return end
+
+    for i = 1, 6 do
+        if occupiedPositions[team][i] == ply then
+            occupiedPositions[team][i] = nil
+            break
+        end
+    end
+end
+
+-- Hook to free position when player disconnects
+hook.Add("PlayerDisconnected", "FreeTeamPosition", function(ply)
+    FreePlayerPosition(ply)
+end)
  
 net.Receive ("normal_spike" , function(bits , ply )
 	local position = net.ReadString()
@@ -883,6 +957,21 @@ net.Receive ("serveking_selected" , function(bits , ply )
 	serveking_count=serveking_count+1 
 end) 
 
-net.Receive ("ace_selected" , function(bits , ply ) 
-	ace_count=ace_count+1 
+net.Receive ("ace_selected" , function(bits , ply )
+	ace_count=ace_count+1
+end)
+
+-- Competitive Mode Setting
+net.Receive ("allow_competitive_mode" , function(bits , ply )
+    if not ply:IsAdmin() and not ply:IsSuperAdmin() then return end -- Only admins can change this
+
+    local enabled = net.ReadBool()
+    allow_competitive_mode = enabled
+
+    -- Broadcast to all clients
+    net.Start("allow_competitive_mode")
+    net.WriteBool(allow_competitive_mode)
+    net.Broadcast()
+
+    PrintMessage(HUD_PRINTTALK, "Competitive Mode: " .. (enabled and "ENABLED" or "DISABLED"))
 end)

@@ -1,5 +1,16 @@
 print("cl_receive_system")
 
+-- Countdown timer variables for feint ball hit indication
+feintCountdownActive = false
+feintCountdownStartTime = 0
+feintCountdownDuration = 0
+
+-- Debug UI for feint ball ground check delay
+local feintDebugDelayActive = false
+local feintDebugDelayTime = 0
+local feintDebugDelayCancelled = false
+local feintDebugDelayCompleted = false
+local feintDebugDelayResultTime = 0
 
 local targetEntity
 
@@ -100,8 +111,9 @@ function ReceivePower()
     hook.Add("Tick", "ReceivePower_HoldDetect", function()
         if not IsValid(ply) then return end
         local holding = input.IsButtonDown(keySetting)
+        local feintHolding = input.IsButtonDown(MOUSE_RIGHT) and not ply:IsOnGround()
 
-        if holding and ply:IsOnGround() then
+        if (holding and ply:IsOnGround()) or feintHolding then
             local closestEnt
             local closestDistSqr = MAX_DIST_SQR
 
@@ -126,13 +138,83 @@ function ReceivePower()
 
                 -- Send to server once when detected within range and cooldown passed
                 if not hasSent and CurTime() - lastReceiveTime > 0.5 then
-                    local sendType = GetSendType()
+                    local sendType
+                    if feintHolding then
+                        sendType = "feint"
+                    else
+                        sendType = GetSendType()
+                    end
                     ReceiveSendToServer(sendType, closestEnt, false, zoneText)
 
                     -- PERFECT feedback
                     if zoneText == "Perfect Receive" then
                         surface.PlaySound("perfect.mp3")
                         perfectReceiveStartTime = CurTime()
+                    end
+
+                    -- Ball ground check for feint
+                    if sendType == "feint" then
+                        local groundHitDetected = false
+                        -- Function to check if the entity's physics object is on the ground
+                        function IsEntityOnGround(entity)
+                            -- Get the position of the entity
+                            local posBall = entity:GetPos()
+
+                            -- Trace a line downward to check for ground collision
+                            local traceBall = util.TraceLine({
+                                start = posBall,
+                                endpos = posBall - Vector(0, 0, 15), -- Slightly reduced from 20 to 15 units
+                                mask = MASK_OPAQUE
+                            })
+
+                            -- Return true if the trace hits the ground, false otherwise
+                            return traceBall.Hit
+                        end
+
+                        -- Function to check if the entity's physics object is on the ground and create a ground marker if so
+                        function BallGroundCheck()
+                            if not groundHitDetected and IsEntityOnGround(closestEnt) then
+                                groundHitDetected = true
+                                -- Capture the position where the ball hit the ground
+                                local hitGroundPos = closestEnt:GetPos()
+
+                                -- Set scoring pending for delayed sending (like server-side)
+                                scoringPending = true
+
+                                -- Start immediate countdown UI when ball hits ground
+                                feintCountdownActive = true
+                                feintCountdownStartTime = CurTime()
+                                feintCountdownDuration = 0.7
+                                print("BALL HIT GROUND - SHOWING MESSAGE")
+
+                                -- Activate debug UI
+                                feintDebugDelayActive = true
+                                feintDebugDelayTime = CurTime() + 0.7
+                                feintDebugDelayCancelled = false
+
+                                -- Delay sending by 0.7 seconds to match server-side scoring delay
+                                timer.Simple(0.7, function()
+                                    feintDebugDelayActive = false -- Deactivate active countdown
+                                    feintDebugDelayCompleted = true -- Show result
+                                    feintDebugDelayResultTime = CurTime() + 3 -- Show result for 3 seconds
+                                    feintCountdownActive = false -- Hide countdown when sending
+
+                                    if scoringPending then
+                                        hook.Remove("Think", "BallChecker") -- Remove the hook as it's no longer needed
+                                        -- Send the position from when the ball hit the ground
+                                        net.Start("BallHitGround")
+                                        net.WriteVector(hitGroundPos)
+                                        net.WriteEntity(closestEnt)
+                                        net.SendToServer()
+                                    end
+                                end)
+                            elseif not groundHitDetected then
+                                hook.Add("Think", "BallChecker", BallGroundCheck) -- Add the hook to keep checking
+                            end
+                        end
+
+                        -- Start checking if the ball is on the ground
+                        BallGroundCheck()
                     end
 
                     hasSent = true
@@ -153,26 +235,35 @@ end
 --- RECEIVE MECHANICS START --------------------------------
 isReceived = false
 function ReceiveSendToServer(powertype,ent,allow_old_mechanic, zoneText)
+	if powertype == "feint" and isSpiked then return end
+	-- Cancel any pending scoring (ball was touched)
+	scoringPending = false
+	debugDelayCancelled = true -- Mark debug UI as cancelled
 	groundHitTimer = nil
 	chat.AddText("receive accuracy:", zoneText)
 
-	-- Position detection: if in pos1-pos2 area, you're on "right" team, else "left" team
-	if ply:GetPos():WithinAABox( pos1, pos2 ) then
-		position = "right"
-		ply:ConCommand("pac_event receive")
-		print("on right side ")
-		isReceived = true
-	else
-		position = "left"
-		ply:ConCommand("pac_event receive")
-		print("on left side ")
-		isReceived = true
-	end
-
 	if powertype == "feint" then
-		//play feint animation
-		ply:ConCommand("pac_event spike")
-	end
+    -- Play feint ONLY
+        if  actionMode.spike then 
+            ply:ConCommand("pac_event feint")
+        else
+             ply:ConCommand("pac_event jumpset")
+        end 
+    else
+        -- Normal receive
+        if ply:GetPos():WithinAABox(pos1, pos2) then
+            position = "right"
+            print("on right side")
+        else
+            position = "left"
+            print("on left side")
+        end
+
+        ply:ConCommand("pac_event receive")
+    end
+
+    isReceived = true
+
 
 	net.Start("receive_power")
 	net.WriteString(position)
@@ -185,3 +276,39 @@ function ReceiveSendToServer(powertype,ent,allow_old_mechanic, zoneText)
 	net.WriteString(zoneText)
 	net.SendToServer()
 end
+
+-- Ball hit ground indicator for feint
+hook.Add("HUDPaint", "BallHitIndicatorFeint", function()
+    if feintCountdownActive then
+        -- Position in center of screen for maximum visibility
+        local indicatorY = ScrH() * 0.2  -- Top 20% of screen
+        local indicatorX = ScrW() / 2
+
+        -- Determine what message to show
+        local indicatorText
+        local textColor
+
+        if feintDebugDelayCancelled then
+            -- Ball was received/touched - show cancel message
+            indicatorText = "SCORING CANCELLED"
+            textColor = Color(255, 0, 0) -- Red for cancelled
+        else
+            -- Normal countdown
+            indicatorText = "Ball Hit Ground"
+            textColor = Color(255, 255, 0) -- Yellow for active
+        end
+
+        surface.SetFont("Trebuchet24")
+        local textWidth, textHeight = surface.GetTextSize(indicatorText)
+
+        -- Smaller background box
+        draw.RoundedBox(10, indicatorX - textWidth/2 - 15, indicatorY - 8, textWidth + 30, textHeight + 16, Color(0, 0, 0, 200))
+
+        -- Border
+        surface.SetDrawColor(textColor.r, textColor.g, textColor.b, 255)
+        surface.DrawOutlinedRect(indicatorX - textWidth/2 - 15, indicatorY - 8, textWidth + 30, textHeight + 16, 2)
+
+        -- Text with appropriate color
+        draw.SimpleText(indicatorText, "Trebuchet24", indicatorX, indicatorY + textHeight/2, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+end)

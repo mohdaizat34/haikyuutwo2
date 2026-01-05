@@ -208,8 +208,11 @@ function BackTossPower(setForce)
 end
 
 function TossSendToServer(powertype,frontback)
+    if isSpiked then return end
+    -- Cancel any pending scoring (ball was touched)
+    scoringPending = false
+    debugDelayCancelled = true -- Mark debug UI as cancelled
     groundHitTimer = nil
-    LocalPlayer():ConCommand("pac_event toss")
     if ply:GetPos():WithinAABox( pos1, pos2 ) then
         position = "left"
     else
@@ -270,117 +273,6 @@ function KageQuickTossHUD()
         end
 
         draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
-
-        draw.SimpleText(
-            label,
-            "Trebuchet24",
-            x + w / 2,
-            y + h / 2,
-            color_white,
-            TEXT_ALIGN_CENTER,
-            TEXT_ALIGN_CENTER
-        )
-    end)
-end
-
---------------------------------------------------
--- MAIN FUNCTION (LOGIC UNCHANGED)
---------------------------------------------------
-function KageQuickToss(setForce)
-    -- FIX nil comparison
-    KAGE_SET_FORCE = setForce or 0
-
-    if KAGE_SET_FORCE <= 0 then return end
-
-    -- Reset state
-    KageToss.power = 0
-    KageToss.bar = 0
-    KageToss.holding = false
-
-    hook.Remove("Tick", "Kage_toss2")
-
-    hook.Add("Tick", "Kage_toss2", function()
-        if not actionMode.block then return end
-
-        if input.IsButtonDown(MOUSE_MIDDLE) then
-            KageToss.holding = true
-
-            if set_power_level_toss == power_level_toss[1] then
-                -- FRONT QUICK TOSS
-                KageToss.mode = "front"
-                KageToss.power = KageToss.power + 1
-            else
-                -- BACK SHOOT TOSS
-                KageToss.mode = "back"
-                KageToss.power = KageToss.power + 1
-            end
-        else
-            if not KageToss.holding then return end
-            KageToss.holding = false
-
-            --------------------------------
-            -- RELEASE LOGIC (UNCHANGED)
-            --------------------------------
-            if KageToss.mode == "front" then
-                if KageToss.power <= KAGE_SET_FORCE then
-                    KageSendToServer("weak", "front", "quick")
-                    chat.AddText("Short Toss!")
-                elseif KageToss.power < 20 then
-                    KageSendToServer("medium", "front", "quick")
-                    chat.AddText("Medium Toss!")
-                else
-                    KageSendToServer("high", "front", "quick")
-                    chat.AddText("Power Toss!")
-                end
-            else
-                KageSendToServer("shoot", "back", "quick")
-                chat.AddText("Back Shoot Toss!")
-            end
-
-            -- Reset
-            KageToss.power = 0
-            KageToss.bar = 0
-        end
-    end)
-end
-
--- Internal state for KageFrontToss HUD
-local KageFrontTossState = {
-    holding = false,
-    power = 0
-}
-
---------------------------------------------------
--- HUD VISUAL (LOW / MID / HIGH) for KageFrontToss
---------------------------------------------------
-function KageFrontTossHUD()
-    hook.Add("HUDPaint", "KageFrontTossHUD", function()
-        if not KageFrontTossState.holding then return end
-        if KAGE_SET_FORCE <= 0 then return end
-
-        local w, h = 320, 36
-        local x, y = ScrW() / 2 - w / 2, ScrH() * 0.65
-
-        -- Background
-        draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
-
-        -- Fill %
-        local pct = math.Clamp(KageFrontTossState.power / 20, 0, 1)
-        local fillW = w * pct
-
-        local col = Color(120, 200, 255)
-        local label = "LOW POWER"
-
-        if KageFrontTossState.power >= KAGE_SET_FORCE then
-            col = Color(120, 255, 120)
-            label = "MID POWER"
-        end
-        if KageFrontTossState.power >= 20 then
-            col = Color(255, 120, 120)
-            label = "HIGH POWER"
-        end
-
-    draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
 
         draw.SimpleText(
             label,
@@ -461,17 +353,231 @@ function KageFrontToss(setForce)
     end)
 end
 
-function KageSendToServer(powertype,frontback,tosstype)
-    if ply:GetPos():WithinAABox( pos1, pos2 ) then
-        position = "left"
-    else
-        position = "right"
-    end
-    net.Start("kage_toss_ability")
-    net.WriteString(position)
-    net.WriteString(powertype)
-    net.WriteString(frontback)
-    net.WriteString(tosstype)
-    net.WriteBool(allow_set_assist)
-    net.SendToServer()
+--------------------------------------------------
+-- MAIN FUNCTION (LOGIC UNCHANGED)
+--------------------------------------------------
+function KageQuickToss(setForce)
+    -- FIX nil comparison
+    KAGE_SET_FORCE = setForce or 0
+
+    if KAGE_SET_FORCE <= 0 then return end
+
+    -- Reset state
+    KageToss.power = 0
+    KageToss.bar = 0
+    KageToss.holding = false
+
+    hook.Remove("Tick", "Kage_toss2")
+
+    hook.Add("Tick", "Kage_toss2", function()
+        if not actionMode.block then return end
+
+        if input.IsButtonDown(MOUSE_MIDDLE) then
+            KageToss.holding = true
+
+            if set_power_level_toss == power_level_toss[1] then
+                -- FRONT QUICK TOSS
+                KageToss.mode = "front"
+                KageToss.power = KageToss.power + 1
+            else
+                -- BACK SHOOT TOSS
+                KageToss.mode = "back"
+                KageToss.power = KageToss.power + 1
+            end
+        else
+            if not KageToss.holding then return end
+            KageToss.holding = false
+
+            --------------------------------
+            -- RELEASE LOGIC (UNCHANGED)
+            --------------------------------
+            if KageToss.mode == "front" then
+                if KageToss.power <= KAGE_SET_FORCE then
+                    KageSendToServer("weak", "front", "quick")
+                    chat.AddText("Short Toss!")
+                elseif KageToss.power < 20 then
+                    KageSendToServer("medium", "front", "quick")
+                    chat.AddText("Medium Toss!")
+                else
+                    KageSendToServer("high", "front", "quick")
+                    chat.AddText("Power Toss!")
+                end
+            else
+                KageSendToServer("shoot", "back", "quick")
+                chat.AddText("Back Shoot Toss!")
+            end
+
+            -- Reset
+            KageToss.power = 0
+            KageToss.bar = 0
+        end
+    end)
+end
+
+function KageSendToServer(powertype,frontback,tosstype)  
+	if ply:GetPos():WithinAABox( pos1, pos2 ) then
+		position = "left"
+	else 
+		position = "right"
+	end 
+	net.Start("kage_toss_ability")
+	net.WriteString(position)
+	net.WriteString(powertype)
+	net.WriteString(frontback)
+	net.WriteString(tosstype)
+	net.WriteBool(allow_set_assist)
+	net.SendToServer()
+end 
+
+-- Internal state for KageFrontToss HUD
+ KageFrontTossState = {
+    holding = false,
+    power = 0
+}
+
+-- Internal state for KageKingToss HUD
+local KageKingTossState = {
+    power = 0,
+    bar = 0,
+    holding = false,
+    mode = "front"
+}
+
+--------------------------------------------------
+-- HUD VISUAL (LOW / MID / HIGH) for KageFrontToss
+--------------------------------------------------
+function KageFrontTossHUD()
+    hook.Add("HUDPaint", "KageFrontTossHUD", function()
+        if not KageFrontTossState.holding then return end
+        if KAGE_SET_FORCE <= 0 then return end
+
+        local w, h = 320, 36
+        local x, y = ScrW() / 2 - w / 2, ScrH() * 0.65
+
+        -- Background
+        draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
+
+        -- Fill %
+        local pct = math.Clamp(KageFrontTossState.power / 20, 0, 1)
+        local fillW = w * pct
+
+        local col = Color(120, 200, 255)
+        local label = "LOW POWER"
+
+        if KageFrontTossState.power >= KAGE_SET_FORCE then
+            col = Color(120, 255, 120)
+            label = "MID POWER"
+        end
+        if KageFrontTossState.power >= 20 then
+            col = Color(255, 120, 120)
+            label = "HIGH POWER"
+        end
+
+    draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
+
+        draw.SimpleText(
+            label,
+            "Trebuchet24",
+            x + w / 2,
+            y + h / 2,
+            color_white,
+            TEXT_ALIGN_CENTER,
+            TEXT_ALIGN_CENTER
+        )
+    end)
+end
+
+--------------------------------------------------
+-- HUD VISUAL (LOW / MID / HIGH) for KageKingToss
+--------------------------------------------------
+function KageKingTossHUD()
+    hook.Add("HUDPaint", "KageKingTossHUD", function()
+        if not KageKingTossState.holding then return end
+        if KAGE_SET_FORCE <= 0 then return end
+
+        local w, h = 320, 36
+        local x, y = ScrW() / 2 - w / 2, ScrH() * 0.65
+
+        -- Background
+        draw.RoundedBox(10, x, y, w, h, Color(20, 20, 20, 220))
+
+        -- Fill %
+        local pct = math.Clamp(KageKingTossState.power / 20, 0, 1)
+        local fillW = w * pct
+
+        local col = Color(120, 200, 255)
+        local label = "LOW POWER"
+
+        if KageKingTossState.power >= KAGE_SET_FORCE then
+            col = Color(120, 255, 120)
+            label = "MID POWER"
+        end
+        if KageKingTossState.power >= 20 then
+            col = Color(255, 120, 120)
+            label = "HIGH POWER"
+        end
+
+        draw.RoundedBox(10, x + 4, y + 4, fillW - 8, h - 8, col)
+
+        draw.SimpleText(
+            label,
+            "Trebuchet24",
+            x + w / 2,
+            y + h / 2,
+            color_white,
+            TEXT_ALIGN_CENTER,
+            TEXT_ALIGN_CENTER
+        )
+    end)
+end
+
+
+
+--------------------------------------------------
+-- MAIN FUNCTION for KageKingToss
+--------------------------------------------------
+function KageKingToss(setForce)
+    -- FIX nil comparison
+    KAGE_SET_FORCE = setForce or 0
+
+    if KAGE_SET_FORCE <= 0 then return end
+
+    -- Reset state
+    KageKingTossState.power = 0
+    KageKingTossState.bar = 0
+    KageKingTossState.holding = false
+
+    hook.Remove("Tick", "Kage_king_toss")
+
+    hook.Add("Tick", "Kage_king_toss", function()
+        if not actionMode.block then return end
+
+        if input.IsButtonDown(KEY_R) then
+            KageKingTossState.holding = true
+
+            KageKingTossState.mode = "front"
+            KageKingTossState.power = KageKingTossState.power + 1
+        else
+            if not KageKingTossState.holding then return end
+            KageKingTossState.holding = false
+
+            --------------------------------
+            -- RELEASE LOGIC
+            --------------------------------
+            if KageKingTossState.power <= KAGE_SET_FORCE then
+                KageSendToServer("weak", "front", "king")
+                chat.AddText("Short Toss!")
+            elseif KageKingTossState.power < 20 then
+                KageSendToServer("medium", "front", "king")
+                chat.AddText("Medium Toss!")
+            else
+                KageSendToServer("high", "front", "king")
+                chat.AddText("Power Toss!")
+            end
+
+            -- Reset
+            KageKingTossState.power = 0
+            KageKingTossState.bar = 0
+        end
+    end)
 end

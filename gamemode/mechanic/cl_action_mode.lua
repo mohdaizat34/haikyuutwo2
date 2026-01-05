@@ -37,6 +37,8 @@ function SwitchActionMode()
 
     DefaultSwitchMode()
 
+    local keyDown = {}
+
     hook.Add("Think", "SwitchActionMode", function()
         ply = LocalPlayer()
         if not IsValid(ply) then return end

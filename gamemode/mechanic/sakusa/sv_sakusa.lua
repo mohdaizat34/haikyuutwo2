@@ -231,9 +231,9 @@ function SpikeSakusaPosition(v,ply,position,power,arc,entityPosVect,direction,al
 
 			end 
  
-			if isSpiked == false then 
-				isSpiked = true 
-				timer.Simple(1,function() isSpiked=false end)
+			local sakusaServerCooldown = sakusaServerCooldown or 0
+			if CurTime() >= sakusaServerCooldown then
+				sakusaServerCooldown = CurTime() + 1
 
 			    v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 1000 + Vector(0,0,50))
                 v:SetPos(entityPosVect) -- Adjust the Z coordinate as needed
@@ -308,9 +308,9 @@ function SpikeSakusaPosition(v,ply,position,power,arc,entityPosVect,direction,al
 			else 
 				--ply:EmitSound("spike.mp3", 70, 100, 1, CHAN_AUTO ) 
 			end
-			if isSpiked == false then 
-				isSpiked = true 
-				timer.Simple(1,function() isSpiked=false end)
+			local sakusaServerCooldown = sakusaServerCooldown or 0
+			if CurTime() >= sakusaServerCooldown then
+				sakusaServerCooldown = CurTime() + 1
 				if ply:Ping() > 0 and allow_spike_assist == true then 
 					ply:SetCollisionGroup( COLLISION_GROUP_WORLD)
 					v:SetPos(entityPosVect) -- Adjust the Z coordinate as needed
@@ -390,4 +390,4 @@ function SpikeSakusaPosition(v,ply,position,power,arc,entityPosVect,direction,al
 			end
 		end 
 	end  
-end  
+end

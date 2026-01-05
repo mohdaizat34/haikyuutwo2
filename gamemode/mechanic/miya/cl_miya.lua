@@ -72,11 +72,13 @@ function MiyaServe()
     miya_pos3 = Vector( 676.425293 ,888.083191, -108.272842)
     miya_pos4 = Vector(1375.196899, 661.645447, 262.988831)
 
-    miya_active = false
+    local canServe = true
+    local delayJumpServe = 0.7
 
-    hook.Add("PlayerButtonDown","miya_serve",function(ply,button)
+    hook.Add("PlayerButtonDown", "miya_serve", function(ply, button)
+        if not canServe then return end
 
-        local keySettingR,keySettingT
+        local keySettingR, keySettingT
 
         if allow_left_assist == false then
             keySettingR = KEY_R
@@ -86,177 +88,116 @@ function MiyaServe()
             keySettingT = KEY_SEMICOLON
         end
 
-        if  ply:GetPos():WithinAABox( miya_pos1, miya_pos2 ) or ply:GetPos():WithinAABox( miya_pos3, miya_pos4)  then
-            if button == keySettingR then
+        if button == MOUSE_RIGHT then
+            if ply:GetPos():WithinAABox(miya_pos1, miya_pos2) or
+               ply:GetPos():WithinAABox(miya_pos3, miya_pos4) then
 
-                net.Start("check_miya_position")
+                jumpActivated = true
+                canServe = false
+
+                actionMode.block = false
+                actionMode.spike = true
+
+                hook.Remove("PlayerButtonDown", "BlockJumpSystem")
+                hook.Remove("PlayerButtonDown", "KeyDown_Block")
+
+                SpikeApproachAnimation()
+                SpikePower(spikePower.force, spikePower.power)
+
+                ply:ConCommand("pac_event jumpserve")
+
+                net.Start("JumpApproachStart")
                 net.SendToServer()
-                --chat.AddText(Color(255,0,0),"Miya Serve is active")
 
-                hook.Remove("PlayerButtonDown","miya_serve",function(ply,button) end)
-                --hook.Remove( "Tick", "KeyDown_Toss", function() end )
-                hook.Remove( "Tick", "Kage_toss2", function() end)
+                -- SMART LAG-COMPENSATED DELAY
+                local adjustedDelay = GetLagAdjustedDelay(delayJumpServe)
 
-                hook.Add("PlayerButtonDown","miya_serve2",function(ply,button)
-                    if button == keySettingR then
-                        if  ply:GetPos():WithinAABox( miya_pos1, miya_pos2 ) or ply:GetPos():WithinAABox( miya_pos3, miya_pos4)  then
+                timer.Simple(adjustedDelay, function()
+                    net.Start("basic_serve")
+                    net.SendToServer()
 
-                            net.Start("miya_ability")
-                            net.WriteString("tossup")
-                            net.SendToServer()
+                    timer.Simple(0.8, function()
+                        ply:ConCommand("pac_event jump")
 
-                        else
-                            hook.Remove("PlayerButtonDown","miya_serve2",function() end)
-                            MiyaServe()
-                        end
-                    end
+                        net.Start("addVelocity")
+                        net.WriteString(character)
+                        net.WriteInt(450, 32)
+                        net.SendToServer()
 
-                    if button == keySettingT then
-                        if  ply:GetPos():WithinAABox( miya_pos1, miya_pos2 ) or ply:GetPos():WithinAABox( miya_pos3, miya_pos4)  then
-                            if character == "miya" then
-                                net.Start("miya_ability")
-                                net.WriteString("spike")
-                                net.WriteString("miya")
-                                net.SendToServer()
-                            elseif character == "korai" then
-                                -- net.Start("miya_ability")
-                                -- net.WriteString("spike")
-                                -- net.WriteString("korai")
-                                -- net.SendToServer()
-                            end
+                        net.Start("JumpApproachEnd")
+                        net.SendToServer()
 
-                            hook.Remove("PlayerButtonDown","miya_serve2",function() end)
-                            hook.Remove( "Tick", "KeyDown_Toss", function() end )
-                            hook.Remove( "Tick", "Kage_toss2", function() end)
+                        isJumping = false
 
-                            local ent =  ents.FindByClass( "prop_physics*" )
-                            for k, v in pairs( ent ) do
-                                if ply:GetPos():DistToSqr( ent[k]:GetPos() ) < 170*170 then
-                                    -- END FAKE BALL VELOCITY -------------------------
-                                    -- Function to check if the entity's physics object is on the ground
-                                    function IsEntityOnGround(entity)
-                                        -- Get the position of the entity
-                                        local posBall = entity:GetPos()
-
-                                        -- Trace a line downward to check for ground collision
-                                        local traceBall = util.TraceLine({
-                                            start = posBall,
-                                            endpos = posBall - Vector(0, 0, 25), -- Adjust the length based on your needs
-                                            mask = MASK_OPAQUE
-                                        })
-
-                                        -- Return true if the trace hits the ground, false otherwise
-                                        return traceBall.Hit
+                        -- Add hook for spike on KEY_R after tossup
+                        hook.Add("PlayerButtonDown", "miya_spike", function(ply, button)
+                            if button == keySettingR and not ply:IsOnGround() and (ply:GetPos():WithinAABox(miya_pos1, miya_pos2) or ply:GetPos():WithinAABox(miya_pos3, miya_pos4)) then
+                                    if character == "miya" then
+                                        net.Start("miya_ability")
+                                        net.WriteString("spike")
+                                        net.WriteString("miya")
+                                        net.SendToServer()
+                                    elseif character == "korai" then
+                                        -- net.Start("miya_ability")
+                                        -- net.WriteString("spike")
+                                        -- net.WriteString("korai")
+                                        -- net.SendToServer()
                                     end
 
-                                    -- Function to check if the entity's physics object is on the ground and create a ground marker if so
-                                    function BallGroundCheck()
-                                        -- Usage example
-                                        if IsEntityOnGround(ent[k]) then
-                                            hook.Remove("Think", "BallChecker") -- Remove the hook as it's no longer needed
-                                            net.Start("BallHitGround")
-                                            net.WriteVector(ent[k]:GetPos())
-                                            net.WriteEntity(ent[k])
-                                            net.SendToServer()
-                                            --CreateGroundMarker(ent[k]:GetPos()) -- Create a ground marker at the position of the entity
-                                        else
-                                            hook.Add("Think", "BallChecker", BallGroundCheck) -- Add the hook to keep checking
+                                    hook.Remove("PlayerButtonDown", "miya_spike")
+                                    hook.Remove("Tick", "KeyDown_Toss")
+                                    hook.Remove("Tick", "Kage_toss2")
+
+                                    local ent = ents.FindByClass("prop_physics*")
+                                    for k, v in pairs(ent) do
+                                        if ply:GetPos():DistToSqr(ent[k]:GetPos()) < 170*170 then
+                                            -- Function to check if the entity's physics object is on the ground
+                                            function IsEntityOnGround(entity)
+                                                local posBall = entity:GetPos()
+                                                local traceBall = util.TraceLine({
+                                                    start = posBall,
+                                                    endpos = posBall - Vector(0, 0, 25),
+                                                    mask = MASK_OPAQUE
+                                                })
+                                                return traceBall.Hit
+                                            end
+
+                                            function BallGroundCheck()
+                                                if IsEntityOnGround(ent[k]) then
+                                                    hook.Remove("Think", "BallChecker")
+                                                    net.Start("BallHitGround")
+                                                    net.WriteVector(ent[k]:GetPos())
+                                                    net.WriteEntity(ent[k])
+                                                    net.SendToServer()
+                                                else
+                                                    hook.Add("Think", "BallChecker", BallGroundCheck)
+                                                end
+                                            end
+
+                                            BallGroundCheck()
                                         end
                                     end
 
-                                    -- Start checking if the ball is on the ground
-                                    BallGroundCheck()
-
-                                end
-                            end
-
-                            MiyaServe()
-                            timer.Create("re",1,1,function()
-                                chat.AddText("Set is now usable")
-                                TossPower(10)
-                                if character == "miya" then
-                                    KageQuickToss(10)
-                                end
-                                timer.Stop("re")
-                            end)
-
-                        else
-                            --hook.Remove("PlayerButtonDown","miya_serve2",function() end)
-                            --TossPower(10)
-                            --KageQuickToss(10)
-                            if character == "miya" then
-                                net.Start("miya_ability")
-                                net.WriteString("spike")
-                                net.WriteString("miya")
-                                net.SendToServer()
-                            elseif character == "korai" then
-                                -- net.Start("miya_ability")
-                                -- net.WriteString("spike")
-                                -- net.WriteString("korai")
-                                -- net.SendToServer()
-                            end
-
-                            hook.Remove("PlayerButtonDown","miya_serve2",function() end)
-                            hook.Remove( "Tick", "KeyDown_Toss", function() end )
-                            hook.Remove( "Tick", "Kage_toss2", function() end)
-
-                            local ent =  ents.FindByClass( "prop_physics*" )
-                            for k, v in pairs( ent ) do
-                                if ply:GetPos():DistToSqr( ent[k]:GetPos() ) < 170*170 then
-                                    -- END FAKE BALL VELOCITY -------------------------
-                                    -- Function to check if the entity's physics object is on the ground
-                                    function IsEntityOnGround(entity)
-                                        -- Get the position of the entity
-                                        local posBall = entity:GetPos()
-
-                                        -- Trace a line downward to check for ground collision
-                                        local traceBall = util.TraceLine({
-                                            start = posBall,
-                                            endpos = posBall - Vector(0, 0, 25), -- Adjust the length based on your needs
-                                            mask = MASK_OPAQUE
-                                        })
-
-                                        -- Return true if the trace hits the ground, false otherwise
-                                        return traceBall.Hit
-                                    end
-
-                                    -- Function to check if the entity's physics object is on the ground and create a ground marker if so
-                                    function BallGroundCheck()
-                                        -- Usage example
-                                        if IsEntityOnGround(ent[k]) then
-                                            hook.Remove("Think", "BallChecker") -- Remove the hook as it's no longer needed
-                                            net.Start("BallHitGround")
-                                            net.WriteVector(ent[k]:GetPos())
-                                            net.WriteEntity(ent[k])
-                                            net.SendToServer()
-                                            --CreateGroundMarker(ent[k]:GetPos()) -- Create a ground marker at the position of the entity
-                                        else
-                                            hook.Add("Think", "BallChecker", BallGroundCheck) -- Add the hook to keep checking
+                                    MiyaServe()
+                                    timer.Create("re", 1, 1, function()
+                                        chat.AddText("Set is now usable")
+                                        TossPower(10)
+                                        if character == "miya" then
+                                            KageQuickToss(10)
                                         end
-                                    end
-
-                                    -- Start checking if the ball is on the ground
-                                    BallGroundCheck()
-
-                                end
+                                        timer.Stop("re")
+                                    end)
                             end
-
-                            MiyaServe()
-
-                            hook.Remove("PlayerButtonDown","miya_serve2",function() end)
-                            MiyaServe()
-                            TossPower(10)
-                            if character == "miya" then
-                                KageQuickToss(10)
-                            end
-                        end
-                    end
+                        end)
+                    end)
                 end)
+
+                timer.Simple(1, function()
+                    canServe = true
+                end)
+            else
+                chat.AddText(Color(255, 100, 100), "Not in area to use serve.")
             end
-
-        else
-
         end
-
     end)
 end

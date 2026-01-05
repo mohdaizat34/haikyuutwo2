@@ -245,27 +245,13 @@ hook.Add("HUDPaint", "GroundHitNotification", function()
         local groundText  = isBallIn and "IN" or "OUT"
         local groundColor = isBallIn and Color(0,255,0) or Color(255,0,0)
 
-        local mat = Material("referee.png")
-        surface.SetMaterial(mat)
-        surface.SetDrawColor(255,255,255,255)
-
-        local imgW, imgH = 128, 128
-        local y = ScrH() * 0.1 - imgH / 2
-
-        surface.DrawTexturedRect(
-            ScrW()/2 - imgW - 10,
-            y,
-            imgW,
-            imgH
-        )
-
         draw.SimpleText(
             groundText,
             "Trebuchet24",
-            ScrW()/2 + 10,
+            ScrW()/2,
             ScrH()*0.1,
             groundColor,
-            TEXT_ALIGN_LEFT,
+            TEXT_ALIGN_CENTER,
             TEXT_ALIGN_TOP
         )
     end

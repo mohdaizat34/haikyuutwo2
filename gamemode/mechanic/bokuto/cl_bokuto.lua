@@ -33,14 +33,22 @@ function BokutoSpike(setForce)
                     local detection_sqr = 115*115
                     local ent =  ents.FindByClass( "prop_physics*" )
                     for k, v in pairs( ent ) do
-                        local toBall = ent[k]:GetPos() - ply:EyePos()
+                        local ballPos = ent[k]:GetPos()
+                        local toBall = ballPos - ply:EyePos()
                         local distOk = toBall:LengthSqr() < detection_sqr
 
                         -- easy mode cone (wide)
                         local aimDot = ply:GetAimVector():Dot(toBall:GetNormalized())
                         local aimOk = aimDot > 0.4   -- EASY MODE
 
-                        if distOk and aimOk then
+                        -- Strict court boundary check - prevent spiking balls on opponent's side
+                        local playerTeam = LocalPlayer():Team()
+                        local NET_Y = 318
+                        local isBallOnMySide =
+                            (playerTeam == 2 and ballPos.y < NET_Y) or
+                            (playerTeam == 1 and ballPos.y > NET_Y)
+
+                        if distOk and aimOk and isBallOnMySide then
 
                             ply:ConCommand("pac_event spike")
                             surface.PlaySound("spike.mp3")
@@ -48,38 +56,45 @@ function BokutoSpike(setForce)
                             release_ball_spike = true
                             --SpikeSakusaSendToServer("strong",spikepower,ent[k],ent[k]:GetPos(),"left",allow_spike_assist)
                             CutSendToServer("right","power",ent[k])
-                            -- Function to check if the entity's physics object is on the ground
+                            -- Ball ground check for bokuto spike
+                            local groundHitDetected = false
                             function IsEntityOnGround(entity)
-                                -- Get the position of the entity
                                 local posBall = entity:GetPos()
-
-                                -- Trace a line downward to check for ground collision
                                 local traceBall = util.TraceLine({
                                     start = posBall,
-                                    endpos = posBall - Vector(0, 0, 23), -- Adjust the length based on your needs
+                                    endpos = posBall - Vector(0, 0, 15),
                                     mask = MASK_OPAQUE
                                 })
-
-                                -- Return true if the trace hits the ground, false otherwise
                                 return traceBall.Hit
                             end
-
-                            -- Function to check if the entity's physics object is on the ground and create a ground marker if so
                             function BallGroundCheck()
-                                -- Usage example
-                                if IsEntityOnGround(ent[k]) then
-                                    hook.Remove("Think", "BallChecker") -- Remove the hook as it's no longer needed
-                                    net.Start("BallHitGround")
-                                    net.WriteVector(ent[k]:GetPos())
-                                    net.WriteEntity(ent[k])
-                                    net.SendToServer()
-                                    --CreateGroundMarker(ent[k]:GetPos()) -- Create a ground marker at the position of the entity
-                                else
-                                    hook.Add("Think", "BallChecker", BallGroundCheck) -- Add the hook to keep checking
+                                if not groundHitDetected and IsEntityOnGround(ent[k]) then
+                                    groundHitDetected = true
+                                    local hitGroundPos = ent[k]:GetPos()
+                                    scoringPending = true
+                                    feintCountdownActive = true
+                                    feintCountdownStartTime = CurTime()
+                                    feintCountdownDuration = 0.7
+                                    feintDebugDelayActive = true
+                                    feintDebugDelayTime = CurTime() + 0.7
+                                    feintDebugDelayCancelled = false
+                                    timer.Simple(0.7, function()
+                                        feintDebugDelayActive = false
+                                        feintDebugDelayCompleted = true
+                                        feintDebugDelayResultTime = CurTime() + 3
+                                        feintCountdownActive = false
+                                        if scoringPending then
+                                            hook.Remove("Think", "BallChecker")
+                                            net.Start("BallHitGround")
+                                            net.WriteVector(hitGroundPos)
+                                            net.WriteEntity(ent[k])
+                                            net.SendToServer()
+                                        end
+                                    end)
+                                elseif not groundHitDetected then
+                                    hook.Add("Think", "BallChecker", BallGroundCheck)
                                 end
                             end
-
-                            -- Start checking if the ball is on the ground
                             BallGroundCheck()
 
                             timer.Simple(1,function() release_ball_spike = false end)
@@ -95,43 +110,58 @@ function BokutoSpike(setForce)
                     for k, v in pairs( ent ) do
                         physObj = ent[k]:GetPhysicsObject()
 
-                        if LocalPlayer():GetPos():DistToSqr( ent[k]:GetPos() ) < 115*115 then
+                        local ballPos = ent[k]:GetPos()
+                        -- Strict court boundary check - prevent spiking balls on opponent's side
+                        local playerTeam = LocalPlayer():Team()
+                        local NET_Y = 318
+                        local isBallOnMySide =
+                            (playerTeam == 2 and ballPos.y < NET_Y) or
+                            (playerTeam == 1 and ballPos.y > NET_Y)
+
+                        if LocalPlayer():GetPos():DistToSqr( ballPos ) < 115*115 and isBallOnMySide then
                             ply:ConCommand("pac_event spike")
                             surface.PlaySound("spike.mp3")
                             release_ball_spike = true
                             CutSendToServer("left","power",ent[k])
-                            -- Function to check if the entity's physics object is on the ground
+                            -- Ball ground check for bokuto spike
+                            local groundHitDetected = false
                             function IsEntityOnGround(entity)
-                                -- Get the position of the entity
                                 local posBall = entity:GetPos()
-
-                                -- Trace a line downward to check for ground collision
                                 local traceBall = util.TraceLine({
                                     start = posBall,
-                                    endpos = posBall - Vector(0, 0, 23), -- Adjust the length based on your needs
+                                    endpos = posBall - Vector(0, 0, 15),
                                     mask = MASK_OPAQUE
                                 })
-
-                                -- Return true if the trace hits the ground, false otherwise
                                 return traceBall.Hit
                             end
-
-                            -- Function to check if the entity's physics object is on the ground and create a ground marker if so
                             function BallGroundCheck()
-                                -- Usage example
-                                if IsEntityOnGround(ent[k]) then
-                                    hook.Remove("Think", "BallChecker") -- Remove the hook as it's no longer needed
-                                    net.Start("BallHitGround")
-                                    net.WriteVector(ent[k]:GetPos())
-                                    net.WriteEntity(ent[k])
-                                    net.SendToServer()
-                                    --CreateGroundMarker(ent[k]:GetPos()) -- Create a ground marker at the position of the entity
-                                else
-                                    hook.Add("Think", "BallChecker", BallGroundCheck) -- Add the hook to keep checking
+                                if not groundHitDetected and IsEntityOnGround(ent[k]) then
+                                    groundHitDetected = true
+                                    local hitGroundPos = ent[k]:GetPos()
+                                    scoringPending = true
+                                    feintCountdownActive = true
+                                    feintCountdownStartTime = CurTime()
+                                    feintCountdownDuration = 0.7
+                                    feintDebugDelayActive = true
+                                    feintDebugDelayTime = CurTime() + 0.7
+                                    feintDebugDelayCancelled = false
+                                    timer.Simple(0.7, function()
+                                        feintDebugDelayActive = false
+                                        feintDebugDelayCompleted = true
+                                        feintDebugDelayResultTime = CurTime() + 3
+                                        feintCountdownActive = false
+                                        if scoringPending then
+                                            hook.Remove("Think", "BallChecker")
+                                            net.Start("BallHitGround")
+                                            net.WriteVector(hitGroundPos)
+                                            net.WriteEntity(ent[k])
+                                            net.SendToServer()
+                                        end
+                                    end)
+                                elseif not groundHitDetected then
+                                    hook.Add("Think", "BallChecker", BallGroundCheck)
                                 end
                             end
-
-                            -- Start checking if the ball is on the ground
                             BallGroundCheck()
 
                             timer.Simple(1,function() release_ball_spike = false end)

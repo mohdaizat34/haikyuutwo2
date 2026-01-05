@@ -59,8 +59,20 @@ include("mechanic/bokuto/cl_bokuto.lua")
 -- ===============================
 include("musicplayer/cl_music_player.lua")
 
+-- Sync isSpiked from server
+isSpiked = false
+scoringPending = false -- Client-side scoring pending flag
+net.Receive("SyncIsSpiked", function()
+    isSpiked = net.ReadBool()
+end)
 
-position = "" 
+-- Cancel scoring when any player receives the ball
+net.Receive("CancelScoring", function()
+    scoringPending = false
+    debugDelayCancelled = true -- Mark debug UI as cancelled
+end)
+
+position = ""
 
 
 hook.Add("PlayerButtonDown","anim",function(ply,button)
@@ -1705,5 +1717,3 @@ hook.Add("PostDrawTranslucentRenderables", "RenderSingleArc", function()
         arcTriggered = false
     end
 end)
-
-

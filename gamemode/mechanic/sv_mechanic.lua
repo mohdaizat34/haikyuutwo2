@@ -22,17 +22,25 @@ util.AddNetworkString("stopMomentum")
 
 util.AddNetworkString("create_wall")
 util.AddNetworkString("topDownView")
+util.AddNetworkString("SyncIsSpiked")
+util.AddNetworkString("StartCountdown")
+util.AddNetworkString("ReceiveMessage")
+util.AddNetworkString("ScoreAnnouncement")
 
---lag compensate 
-util.AddNetworkString("illusion_effect") 
+--lag compensate
+util.AddNetworkString("illusion_effect")
 --ball detector
 util.AddNetworkString("BallHitGroundClient")
 util.AddNetworkString("BallHitGround")
+util.AddNetworkString("CancelScoring")
+util.AddNetworkString("UpdateScore")
 -- collide
 util.AddNetworkString("get_collide_info")
 util.AddNetworkString("PrintEveryone")
 -- player aim prediction
 util.AddNetworkString("PlayerAimPrediction")
+-- spike position info
+util.AddNetworkString("SpikePositionInfo")
 
 --Jump System
 util.AddNetworkString("addVelocity")
@@ -85,24 +93,162 @@ net.Receive("get_collide_info",function(bits,ply)
 end) 
 
 net.Receive("BallHitGround",function(bits,ply)
-	local ballPos = net.ReadVector() 
-	local ballEnt = net.ReadEntity() 
+	local ballPos = net.ReadVector()
+	local ballEnt = net.ReadEntity()
 
 	ballEnt:SetElasticity(0.3) -- 1 means maximum bounciness, 0 means no bounce
 	ballEnt:GetPhysicsObject():SetMaterial("dirt")
-	EmitSound( "ballimpact2.wav", ballPos, 0, CHAN_AUTO, 1, 75, 0, 100 )
-	
+	-- Removed ball landing sound effect
+
+	-- Set scoring pending for delayed scoring
+	scoringPending = true
+
+	-- Start countdown UI for all players
+	net.Start("StartCountdown")
+	net.WriteFloat(0.7) -- Duration in seconds
+	net.Broadcast()
+
+	-- Delay scoring by 0.7 seconds
+	timer.Simple(0.7, function()
+		if scoringPending and not rallyEnded and allow_competitive_mode then
+			-- Determine if ball is in court bounds
+			local courtMin = Vector(794.318298, -40.005096, -100)
+			local courtMax = Vector(1207.460327, 676.799255, 100)
+			local isBallInCourt = ballPos:WithinAABox(courtMin, courtMax)
+
+			-- Determine scoring based on last ball toucher and ball position
+			local scoringTeam = 0
+			local pointReason = ""
+
+			if lastBallToucher then
+				if lastTouchWasBlock then
+					-- Special scoring for blocks
+					if isBallInCourt then
+						-- Check which team's court the ball landed in
+						local isBallInBlockerCourt = ballPos:WithinAABox(TEAM1_COURT_MIN, TEAM1_COURT_MAX) and lastBallToucherTeam == 1 or
+						                            ballPos:WithinAABox(TEAM2_COURT_MIN, TEAM2_COURT_MAX) and lastBallToucherTeam == 2
+
+						if isBallInBlockerCourt then
+							-- Ball landed in blocker's court - attacking team scores (block failed to keep ball away)
+							scoringTeam = (lastBallToucherTeam == 1) and 2 or 1
+							pointReason = lastBallToucher:Nick() .. " blocked the ball but it landed in own court - attacking team scores!"
+						else
+							-- Ball landed in attacker's court - blocking team scores (successful block)
+							scoringTeam = lastBallToucherTeam
+							pointReason = lastBallToucher:Nick() .. " successfully blocked the ball - blocking team scores!"
+						end
+					else
+						-- Blocked ball out of court - attacking team scores (blocking team failed to keep ball in play)
+						scoringTeam = (lastBallToucherTeam == 1) and 2 or 1
+						pointReason = lastBallToucher:Nick() .. " blocked the ball out of court - attacking team scores!"
+					end
+				else
+					-- Normal scoring for non-block touches
+					if isBallInCourt then
+						-- Check which team's court the ball landed in
+						local isBallInPlayerCourt = ballPos:WithinAABox(TEAM1_COURT_MIN, TEAM1_COURT_MAX) and lastBallToucherTeam == 1 or
+						                           ballPos:WithinAABox(TEAM2_COURT_MIN, TEAM2_COURT_MAX) and lastBallToucherTeam == 2
+
+						if isBallInPlayerCourt then
+							-- Ball landed in player's own court - opposite team gets point
+							scoringTeam = (lastBallToucherTeam == 1) and 2 or 1
+							pointReason = lastBallToucher:Nick() .. " hit the ball into own court - point to opposite team!"
+						else
+							-- Ball landed in opponent's court - player's team gets point
+							scoringTeam = lastBallToucherTeam
+							pointReason = lastBallToucher:Nick() .. " hit the ball into opponent's court - point to own team!"
+						end
+					else
+						-- Ball out of court - team of last toucher loses point (opposite team scores)
+						scoringTeam = (lastBallToucherTeam == 1) and 2 or 1
+						pointReason = lastBallToucher:Nick() .. " hit the ball out of court!"
+					end
+				end
+
+				-- Update score
+				if scoringTeam >= 1 and scoringTeam <= 2 then
+					teamScores[scoringTeam] = teamScores[scoringTeam] + 1
+
+					-- Broadcast score update to all players
+					net.Start("UpdateScore")
+					net.WriteInt(scoringTeam, 8)
+					net.WriteInt(teamScores[scoringTeam], 16)
+					net.WriteString(pointReason)
+					net.Broadcast()
+
+					if scoringTeam == 2 then scoringTeam = 'RED' else scoringtTeam = 'BLUE' end 
+					-- Announce the point via HUD message
+					net.Start("ScoreAnnouncement")
+					net.WriteString("POINT! " .. pointReason)
+					net.WriteString("POINT! Team " .. scoringTeam .. " scores!")
+					net.Broadcast()
+
+					-- Mark rally as ended to prevent double scoring
+					rallyEnded = true
+
+					-- Reset ball toucher for next rally
+					lastBallToucher = nil
+					lastBallToucherTeam = 0
+					lastTouchWasBlock = false
+				end
+			else
+				-- No last toucher recorded (serve or other case)
+				if not isBallInCourt then
+					-- Ball out - determine based on ball position relative to court center
+					local courtCenter = Vector(1000.89, 318.4, 0) -- Approximate court center
+					if ballPos.y < courtCenter.y then
+						scoringTeam = 2 -- Right side out, left team scores
+						pointReason = "Ball out on right side!"
+					else
+						scoringTeam = 1 -- Left side out, right team scores
+						pointReason = "Ball out on left side!"
+					end
+
+					teamScores[scoringTeam] = teamScores[scoringTeam] + 1
+
+					net.Start("UpdateScore")
+					net.WriteInt(scoringTeam, 8)
+					net.WriteInt(teamScores[scoringTeam], 16)
+					net.WriteString(pointReason)
+					net.Broadcast()
+
+					-- Announce the point via HUD message
+					net.Start("ScoreAnnouncement")
+					net.WriteString("POINT! " .. pointReason)
+					net.WriteString("POINT! Team " .. scoringTeam .. " scores!")
+					net.Broadcast()
+				end
+			end
+		end
+	end)
+
 	net.Start("BallHitGroundClient")
 	net.WriteVector(ballPos)
 	net.WriteEntity(ballEnt)
-	net.Broadcast() 
-end) 
+	net.WriteBool(ballPos:WithinAABox(Vector(794.318298, -40.005096, -100), Vector(1207.460327, 676.799255, 100)))
+	net.Broadcast()
+end)
 
 
 ball_status = ""
 one_time_message = ""
-isReceived = false 
-isSpiked = false 
+isReceived = false
+isSpiked = false
+spikeMessageCooldown = 0
+
+-- Ball touch tracking and scoring system
+lastBallToucher = nil
+lastBallToucherTeam = 0
+lastTouchWasBlock = false -- Track if the last touch was a block
+teamScores = {0, 0} -- Index 1 = Team 1, Index 2 = Team 2
+scoringPending = false -- Flag for delayed scoring after ball hits ground
+rallyEnded = false -- Flag to prevent multiple scoring per rally
+
+-- Court boundaries for Team 1 and Team 2 (split vertically - top/bottom)
+TEAM1_COURT_MIN = Vector(794.318298, 318.4, -100)  -- Top half court (full width)
+TEAM1_COURT_MAX = Vector(1207.460327, 676.799255, 100)
+TEAM2_COURT_MIN = Vector(794.318298, -40.005096, -100) -- Bottom half court (full width)
+TEAM2_COURT_MAX = Vector(1207.460327, 318.4, 100)
 
 
 local cooldown = false
@@ -124,6 +270,24 @@ net.Receive("create_wall",function(bits,ply)
 	blockerTsuki:SetModel( "models/props/court/blockpanel_s.mdl" )
 	blockerTsuki2:SetModel( "models/props/court/blockpanel_s.mdl" )
 	blockerKuro:SetModel( "models/props/court/blockpanel_s.mdl" )
+
+	-- Set blocker colors based on team
+	local creatorTeam = ply:Team()
+	if creatorTeam == 1 then
+		-- Team 1: Light blue
+		blocker:SetColor(Color(114, 144, 228))
+		blockerMedium:SetColor(Color(114, 144, 228))
+		blockerTsuki:SetColor(Color(114, 144, 228))
+		blockerTsuki2:SetColor(Color(114, 144, 228))
+		blockerKuro:SetColor(Color(114, 144, 228))
+	elseif creatorTeam == 2 then
+		-- Team 2: Red
+		blocker:SetColor(Color(255, 0, 0, 255))
+		blockerMedium:SetColor(Color(255, 0, 0, 255))
+		blockerTsuki:SetColor(Color(255, 0, 0, 255))
+		blockerTsuki2:SetColor(Color(255, 0, 0, 255))
+		blockerKuro:SetColor(Color(255, 0, 0, 255))
+	end
     -- blocker2:SetModel( "models/props_debris/metal_panel01a.mdl" )
     -- tsukiBlock:SetModel( "models/props_debris/metal_panel01a.mdl" )
 
@@ -150,7 +314,6 @@ net.Receive("create_wall",function(bits,ply)
 	blockerKuro:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 
 	-- Tag blockers for collision detection and store creator
-	local creatorTeam = ply:Team()
 	blocker:SetName("kabe")
 	blocker:SetNWInt("BlockCreatorTeam", creatorTeam)
 	blocker:SetNWString("BlockCreator", ply:Nick())
@@ -344,35 +507,44 @@ net.Receive ("spike_power_hinata" , function(bits , ply )
 	local position = net.ReadString()
 	local power = net.ReadString()
 	local spikepower = net.ReadInt(32)
-	local character = net.ReadString() 
+	local character = net.ReadString()
 	local entityBall = net.ReadEntity()
-	local entityPosVect = net.ReadVector() 
+	local entityPosVect = net.ReadVector()
 	local allow_spike_assist = net.ReadBool()
-	    
+	local playerPos = net.ReadVector()
+	local reachCM = net.ReadInt(16)
+
 	local ent =  ents.FindByClass( "prop_physics*" )
 
 	print("ball mass:"..entityBall:GetPhysicsObject():GetMass())
 	print("ball damping:"..entityBall:GetPhysicsObject():GetDamping())
 	print("ball GetVelocity:"..tostring(entityBall:GetPhysicsObject():GetVelocity()))
 
-	ply:ConCommand("pac_event spike")   
-	
+	ply:ConCommand("pac_event spike")
+
 	ply:SetCollisionGroup( COLLISION_GROUP_WORLD)
 
 
-	if power == "weak" then 
-		ply:EmitSound("spike.mp3", 70, 100, 1, CHAN_AUTO ) 
-		SpikePosition(entityBall,ply,position,700,0,entityPosVect,allow_spike_assist)  
-	else 
-		
-		if character == "ushijima" then 
+	if power == "weak" then
+		ply:EmitSound("spike.mp3", 70, 100, 1, CHAN_AUTO )
+		SpikePosition(entityBall,ply,position,700,0,entityPosVect,allow_spike_assist)
+	else
+
+		if character == "ushijima" then
 			--game.SetTimeScale( 0.1 )
-			SpikePosition(entityBall,ply,position,spikepower,0,entityPosVect,allow_spike_assist) 
-		else 
 			SpikePosition(entityBall,ply,position,spikepower,0,entityPosVect,allow_spike_assist)
-		end  
-	end 
-	
+		else
+			SpikePosition(entityBall,ply,position,spikepower,0,entityPosVect,allow_spike_assist)
+		end
+	end
+
+	-- Broadcast spike position info to all clients
+	net.Start("SpikePositionInfo")
+	net.WriteVector(playerPos)
+	net.WriteInt(reachCM, 16)
+	net.WriteString(ply:Nick())
+	net.Broadcast()
+
 end)
 
 net.Receive ("fake_spike" , function(bits , ply )
@@ -385,6 +557,16 @@ randomSoundHinata = {"hina/hinataspike2.mp3","hina/hinataspike3.mp3"}
 randomSoundKorai = {"korai/hoshiumispike1.wav","korai/hoshiumispike2.wav"} 
 		
 function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_assist)
+    -- Cancel pending scoring since ball was touched
+    scoringPending = false
+
+    -- Reset rally flag for new rally
+    rallyEnded = false
+
+    -- Track who last touched the ball
+    lastBallToucher = ply
+    lastBallToucherTeam = ply:Team()
+
     -- Broadcast player aim prediction to all clients
     net.Start("PlayerAimPrediction")
     net.WriteString(ply:Nick())
@@ -400,7 +582,10 @@ function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_
         print(v:GetPos():WithinAABox(pos3, pos4))
 
         if v:GetPos():WithinAABox(pos3, pos4) then
-            ply:ChatPrint("Can't spike ball over other team area!")
+            if CurTime() > spikeMessageCooldown then
+                ply:ChatPrint("Can't spike ball over other team area!")
+                spikeMessageCooldown = CurTime() + 1
+            end
         else
             ball_status = "spike"
             if power == 400 then
@@ -411,8 +596,14 @@ function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_
             if allow_delay then
                 if isSpiked == false then
                     isSpiked = true
-                    timer.Simple(1, function() 
-						isSpiked = false 
+                    net.Start("SyncIsSpiked")
+                    net.WriteBool(true)
+                    net.Broadcast()
+                    timer.Simple(1, function()
+						isSpiked = false
+                        net.Start("SyncIsSpiked")
+                        net.WriteBool(false)
+                        net.Broadcast()
 					end)
 
                     if ply:Ping() > 0 and allow_spike_assist == true then
@@ -496,7 +687,10 @@ function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_
         end
     else
         if v:GetPos():WithinAABox(pos1, pos2) then
-            ply:ChatPrint("Can't spike ball over other team area!")
+            if CurTime() > spikeMessageCooldown then
+                ply:ChatPrint("Can't spike ball over other team area!")
+                spikeMessageCooldown = CurTime() + 1
+            end
         else
             ball_status = "spike"
             if power == 400 then
@@ -508,7 +702,15 @@ function SpikePosition(v, ply, position, power, arc, entityPosVect, allow_spike_
             if allow_delay then
                 if isSpiked == false then
                     isSpiked = true
-                    timer.Simple(1, function() isSpiked = false end)
+                    net.Start("SyncIsSpiked")
+                    net.WriteBool(true)
+                    net.Broadcast()
+                    timer.Simple(1, function()
+						isSpiked = false
+                        net.Start("SyncIsSpiked")
+                        net.WriteBool(false)
+                        net.Broadcast()
+					end)
 
                     if ply:Ping() > 0 and allow_spike_assist == true then
                         ply:SetCollisionGroup(COLLISION_GROUP_WORLD)
@@ -680,6 +882,26 @@ end
 end 
 
 function ReceivePosition(v, vPos, ply, position, power, arc, allow_receive_assist, allow_old_receive, zoneText)
+    -- Cancel pending scoring since ball was touched
+    scoringPending = false
+
+    -- Reset rally flag for new rally
+    rallyEnded = false
+
+    -- Broadcast to all clients to cancel their pending scoring delays
+    net.Start("CancelScoring")
+    net.Broadcast()
+
+    -- Cancel any pending Yamaguchi serve drop timer
+    if v.YamaguchiDropTimer and timer.Exists(v.YamaguchiDropTimer) then
+        timer.Remove(v.YamaguchiDropTimer)
+        v.YamaguchiDropTimer = nil
+    end
+
+    -- Track who last touched the ball
+    lastBallToucher = ply
+    lastBallToucherTeam = ply:Team()
+
     -- Reposition the ball slightly in front of the player
     local offsetInFront = ply:GetForward() * 10
     local newPosition = ply:GetPos() + offsetInFront
@@ -692,9 +914,11 @@ function ReceivePosition(v, vPos, ply, position, power, arc, allow_receive_assis
 		local finalVelocity
 
 		if zoneText == "Bad Receive" then
-			for _, p in ipairs(player.GetAll()) do
-				p:ChatPrint(ply:Nick() .. " made a BAD receive!")
-			end
+			-- Send bad receive message to all clients
+			net.Start("ReceiveMessage")
+			net.WriteString(ply:Nick() .. " made a BAD receive!")
+			net.WriteBool(false) -- false = bad receive (red color)
+			net.Broadcast()
 			-- Strong angle error (left/right)
 			local shankAngle = math.random(-40, 40) -- degrees
 			local forwardDir = ply:GetForward()
@@ -708,9 +932,11 @@ function ReceivePosition(v, vPos, ply, position, power, arc, allow_receive_assis
 				shankDir:Forward() * velPower +
 				Vector(0, 0, velArc + arcVariance)
 		else
-			for _, p in ipairs(player.GetAll()) do
-				p:ChatPrint(ply:Nick() .. " made a PERFECT receive!")
-			end
+			-- Send perfect receive message to all clients
+			net.Start("ReceiveMessage")
+			net.WriteString(ply:Nick() .. " made a PERFECT receive!")
+			net.WriteBool(true) -- true = perfect receive (green color)
+			net.Broadcast()
 			-- Clean receive
 			finalVelocity =
 				ply:GetForward() * velPower +
@@ -771,9 +997,18 @@ end
 
 
 
-function TossPosition(v,ply,position,power,arc,frontback,allow_set_assist) 
+function TossPosition(v,ply,position,power,arc,frontback,allow_set_assist)
+    -- Cancel pending scoring since ball was touched
+    scoringPending = false
 
-	SafeRemoveEntity( trail )	
+    -- Reset rally flag for new rally
+    rallyEnded = false
+
+    -- Track who last touched the ball
+    lastBallToucher = ply
+    lastBallToucherTeam = ply:Team()
+
+	SafeRemoveEntity( trail )
 	trail = util.SpriteTrail( v, 0, Color(102, 102, 102,800 ), false, 15, 1, 0.3, 1 / ( 15 + 1 ) * 0.5, "trails/plasma" )
 
 
@@ -1168,18 +1403,28 @@ net.Receive ("miya_ability" , function(bits , ply )
 				--if(v:GetName() =='volleyball1' or v:GetName() == 'volleyball2' or v:GetName() == 'volleyball3') then 
 				if character == "miya" then
 					v:SetPos(ply:GetPos() + Vector(0, 0, 100))
-					v:GetPhysicsObject():SetVelocity(ply:GetForward() * 1600 + Vector(0,0,30)) 
-					
-					-- Define the function to apply a downward force to the ball
-					local function ApplyDownwardForce()
-						local downwardForce = Vector(0, 0, -11000)  -- Adjust the force as needed
-						v:GetPhysicsObject():ApplyForceCenter(downwardForce)
+					-- Realistic jump serve spike trajectory with moderate top spin
+					local forwardVel = ply:GetForward() * 1400  -- Faster forward momentum
+					local upwardVel = Vector(0, 0, 50)         -- Minimal upward arc
+					local sideVel = Vector(math.random(-500, 500), 0, 0)  -- Random side curve
+					v:GetPhysicsObject():SetVelocity(forwardVel + upwardVel + sideVel)
+
+					-- Add moderate top spin for realistic trajectory
+					local topSpinSpeed = 3000  -- Moderate top spin
+					v:GetPhysicsObject():AddAngleVelocity(Vector(0, -topSpinSpeed, 0))  -- Top spin when moving forward
+
+					-- Apply stronger gravity effect over time for faster drop to same point
+					local function ApplyGravityArc()
+						local gravityForce = Vector(0, 0, -3500)  -- Stronger downward pull for faster drop
+						v:GetPhysicsObject():ApplyForceCenter(gravityForce)
 					end
 
-					-- Set a timer to apply the downward force after 0.5 seconds
+					-- Apply gravity in stages for smooth, realistic arc
+					timer.Simple(0.1, ApplyGravityArc)
+					timer.Simple(0.2, ApplyGravityArc)
 					timer.Simple(0.3, function()
-						ApplyDownwardForce()
-						ply:EmitSound("miya/miya_spike3.mp3", 70, 100, 1, CHAN_AUTO )  
+						ApplyGravityArc()
+						ply:EmitSound("miya/miya_spike3.mp3", 70, 100, 1, CHAN_AUTO )
 						ply:ConCommand("pac_event spike")
 					end)
 
@@ -1228,76 +1473,89 @@ net.Receive ("bokuto_cut" , function(bits , ply )
 
 		v:SetPos(Vector(entityPosVect))
 		
-		if position == "left" then  
+		if position == "left" then
 			if v:GetPos():WithinAABox( pos3, pos4 ) then
-				ply:ChatPrint("Can't spike ball over other team area!") 
-			else  
+				if CurTime() > spikeMessageCooldown then
+					ply:ChatPrint("Can't spike ball over other team area!")
+					spikeMessageCooldown = CurTime() + 1
+				end
+			else
 				ball_status = "spike"
-				if direction == "right" then 
+				if direction == "right" then
 					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO )
 					v:SetPos(entityPosVect)
-					v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 800  + Vector(900,0,-150)) 
-				else 
-					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO )  
+					v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 800  + Vector(900,0,-150))
+				else
+					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO )
 					v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 800  + Vector(-900,0,-150))
-				end   
-			end 
-		else  
+				end
+			end
+		else
 			if v:GetPos():WithinAABox( pos1, pos2 ) then
-				ply:ChatPrint("Can't spike ball over other team area!")
-
-			else 
-				if direction == "left" then 
-					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO ) 
-					v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 800  + Vector(900,0,-150)) 
-				else 
-					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO )  
+				if CurTime() > spikeMessageCooldown then
+					ply:ChatPrint("Can't spike ball over other team area!")
+					spikeMessageCooldown = CurTime() + 1
+				end
+			else
+				if direction == "left" then
+					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO )
+					v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 800  + Vector(900,0,-150))
+				else
+					ply:EmitSound("boku/bokutospike2.mp3", 70, 100, 1, CHAN_AUTO )
 					v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 800  + Vector(-900,0,-150))
-				end 
-			end 
-		end 
+				end
+			end
+		end
 
 end) 
 
--- yamaguchi 
+-- yamaguchi
 net.Receive ("yama_ability" , function(bits , ply )
-	local servetype = net.ReadString() 
+	local servetype = net.ReadString()
 	local ent =  ents.FindByClass( "prop_physics*" )
-	local randomdrop = {0.3,0.4,0.5,0.6} 
-	local leftright = {250,-250} 
-	local random = table.Random(randomdrop)
-	local randompower = {200,200}
-	local randomstop = {400,10}
 
-	if servetype == "tossup" then 
-		for k, v in pairs( ent ) do   
-			if ply:GetPos():DistToSqr( v:GetPos() ) < 120*120 then     
-				--if(v:GetName() =='volleyball1' or v:GetName() == 'volleyball2' or v:GetName() == 'volleyball3') then 
-					v:GetPhysicsObject():SetVelocity(ply:GetForward() * 20 + Vector(0,0,600)) 
+	if servetype == "tossup" then
+		for k, v in pairs( ent ) do
+			if ply:GetPos():DistToSqr( v:GetPos() ) < 120*120 then
+				--if(v:GetName() =='volleyball1' or v:GetName() == 'volleyball2' or v:GetName() == 'volleyball3') then
+					v:GetPhysicsObject():SetAngles(Angle(0, 0, 0))
+					v:GetPhysicsObject():SetAngleVelocity(Vector(0, 0, 0))
+					v:GetPhysicsObject():SetVelocity(ply:GetForward() * 20 + Vector(0,0,600))
 					ply:EmitSound("tossup.mp3", 70, 100, 1, CHAN_AUTO )
 				--end
-			end    
-		end 
-	else 
-		for k, v in pairs( ent ) do   
-			if ply:GetPos():DistToSqr( v:GetPos() ) < 120*120 then     
+			end
+		end
+	else
+		for k, v in pairs( ent ) do
+			if ply:GetPos():DistToSqr( v:GetPos() ) < 120*120 then
 				ply:EmitSound("yama/yamaserve.mp3", 70, 100, 1, CHAN_AUTO )
-				v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 200 + Vector(0,0,0))  
-				timer.Create("slowdown",0.2,1,function() v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 400 + Vector(0,0,150))  end) 
 
-				timer.Create("slowdown",0.2,1,function() v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 400 + Vector(60,0,50))  
-					timer.Create("slowdown",0.2,1,function() v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 400 + Vector(-60,0,-50)) 
-						timer.Create("slowdown",0.2,1,function() v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 400 + Vector(60,0,100))
-							timer.Create("slowdown",0.2,1,function() v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * 400 + Vector(-60,0,50))  
-								timer.Create("slowdown",table.Random(randomdrop),1,function() v:GetPhysicsObject():SetVelocity(ply:GetAimVector() * table.Random(randomstop) + Vector(table.Random(leftright),0,-300))  end)
-							end)
-						end)
-					end)
-				end)		
-			end   
-		end 
-	end 
-end) 
+				-- Float serve: no spin, floating trajectory with unpredictable left/right wiggle
+				local aimVector = ply:GetAimVector()
+				local baseVelocity = aimVector * 600  -- Moderate forward speed
+				local floatUp = Vector(0, 0, 150)     -- Initial upward float
+				local randomSide = Vector(math.random(-150, 150), 0, 0)  -- Increased random side wiggle
+
+				v:GetPhysicsObject():SetVelocity(baseVelocity + floatUp + randomSide)
+				v:GetPhysicsObject():SetAngles(Angle(0, 0, 0))
+				v:GetPhysicsObject():SetAngleVelocity(Vector(0, 0, 0))  -- Ensure no spin
+
+				-- Float phase: maintain height with gentle forces
+				local floatDuration = math.random(0.8, 1.2)  -- Random float time
+				local dropTimer = timer.Simple(floatDuration, function()
+					if IsValid(v) then
+						-- Sudden drop with unpredictable direction
+						local dropVelocity = aimVector * 200 + Vector(math.random(-100, 100), 0, -400)
+						v:GetPhysicsObject():SetVelocity(dropVelocity)
+						v:GetPhysicsObject():AddAngleVelocity(Vector(math.random(-200, 200), math.random(-200, 200), math.random(-200, 200)))  -- Random spin on drop
+					end
+				end)
+				-- Store timer reference on the ball entity for cancellation
+				v.YamaguchiDropTimer = dropTimer
+			end
+		end
+	end
+end)
 ---------------------------------------------------------------------
 -- Assuming you're working with a player entity (e.g., a character or player controller)
 
@@ -1418,8 +1676,7 @@ net.Receive("toss_power", function(bits, ply)
         if frontback == "front" then
             ply:ConCommand("pac_event set")
             if ply:GetPos():DistToSqr(v:GetPos()) < 120 * 120 then
-                ply:ConCommand("pac_event set")
-                ply:ConCommand("pac_event jumpset")
+				if (!ply:IsOnGround()) then  ply:ConCommand("pac_event jumpset") else  ply:ConCommand("pac_event toss") end 
 
                 --v:SetVelocity(v:GetForward() * 500 + Vector(0,0,1000)) 
                 --if(v:GetName() =='volleyball1' or v:GetName() == 'volleyball2' or v:GetName() == 'volleyball3') then   
@@ -1441,9 +1698,8 @@ net.Receive("toss_power", function(bits, ply)
         else
             if ply:GetPos():DistToSqr(v:GetPos()) < 120 * 120 then
                 -- ply:ConCommand("pac_event backset")
-                ply:ConCommand("pac_event jumpbackset")
-				ply:ConCommand("pac_event backset")
-
+ 
+			if (!ply:IsOnGround()) then  ply:ConCommand("pac_event jumpbackset") else  ply:ConCommand("pac_event backset") end 
 
 				if isSpiked != true then 
 					if isReceived == false then 
@@ -1626,46 +1882,78 @@ end)
 -- Automatic block detection system
 local lastBlockTime = 0
 
--- Add collision detection to volleyball when it's created
-hook.Add("OnEntityCreated", "SetupVolleyballCollision", function(ent)
+-- Function to add collision detection to a volleyball
+local function AddBlockCollisionToVolleyball(ent)
     if not IsValid(ent) then return end
     if ent:GetClass() ~= "prop_physics" then return end
 
-    -- Wait a bit for the entity to be fully initialized
-    timer.Simple(0.1, function()
-        if not IsValid(ent) then return end
-
-        -- Check if this is a volleyball (any volleyball entity)
-        if string.find(ent:GetName(), "volleyball") then
-            -- Add collision callback to the volleyball
-            ent:AddCallback("PhysicsCollide", function(ent, data)
-                local hitEnt = data.HitEntity
-                if IsValid(hitEnt) and hitEnt:GetName() == "kabe" then
-                    -- Prevent spam by checking time since last block
-                    if CurTime() - lastBlockTime > 1.0 then
-                        local blockerTeam = hitEnt:GetNWInt("BlockCreatorTeam", 0)
-                        local blockerName = hitEnt:GetNWString("BlockCreator", "Unknown")
-
-                        -- Debug prints
-                        print("Block collision detected!")
-                        print("Blocker Team NWVar:", hitEnt:GetNWInt("BlockCreatorTeam", -999))
-                        print("Blocker Name NWVar:", hitEnt:GetNWString("BlockCreator", "NOT_SET"))
-
-                        PrintMessage(HUD_PRINTTALK, "BLOCK TOUCH by " .. blockerName .. " (Team " .. blockerTeam .. ")!")
-
-                        -- Award point to the blocking team
-                        if blockerTeam == 1 then
-                            -- Award point to Blue team
-
-                        elseif blockerTeam == 2 then
-
-                        lastBlockTime = CurTime()
-                    end
-                end
-            end)
+    -- Check if this is a volleyball (any volleyball entity)
+    if string.find(ent:GetName(), "volleyball") then
+        -- Remove any existing collision callback first
+        if ent.BlockCollisionCallback then
+            ent:RemoveCallback("PhysicsCollide", ent.BlockCollisionCallback)
         end
+
+        -- Add collision callback to the volleyball
+        ent.BlockCollisionCallback = ent:AddCallback("PhysicsCollide", function(ent, data)
+            local hitEnt = data.HitEntity
+            if IsValid(hitEnt) and hitEnt:GetName() == "kabe" then
+                -- Prevent spam by checking time since last block
+                if CurTime() - lastBlockTime > 1.0 then
+                    local blockerTeam = hitEnt:GetNWInt("BlockCreatorTeam", 0)
+                    local blockerName = hitEnt:GetNWString("BlockCreator", "Unknown")
+
+                    -- Debug prints
+                    print("BLOCK COLLISION DETECTED!")
+                    print("Blocker Team:", blockerTeam, "Blocker Name:", blockerName)
+
+                    PrintMessage(HUD_PRINTTALK, "BLOCK TOUCH by " .. blockerName .. " (Team " .. blockerTeam .. ")!")
+
+                    -- Track who last touched the ball (blocker) - PRIORITY: Block collisions override player actions
+                    -- For dummy blocks, create a pseudo-player object since there's no real player
+                    if blockerName == "Team2Blocker" or blockerName == "OppositeTeamBlocker" then
+                        -- Create a pseudo-player object for dummy blocks
+                        lastBallToucher = {
+                            Nick = function() return blockerName end,
+                            Team = function() return blockerTeam end,
+                            IsValid = function() return true end
+                        }
+                        lastBallToucherTeam = blockerTeam
+                        lastTouchWasBlock = true -- Mark this as a block touch
+                        print("BLOCK COLLISION: Last ball toucher updated to dummy blocker:", blockerName, "Team:", blockerTeam)
+                    else
+                        -- Find the real player who created this block
+                        for _, ply in ipairs(player.GetAll()) do
+                            if ply:Nick() == blockerName and ply:Team() == blockerTeam then
+                                lastBallToucher = ply
+                                lastBallToucherTeam = blockerTeam
+                                lastTouchWasBlock = true -- Mark this as a block touch
+                                print("BLOCK COLLISION: Last ball toucher updated to real blocker:", blockerName, "Team:", blockerTeam)
+                                break
+                            end
+                        end
+                    end
+
+                    lastBlockTime = CurTime()
+                end
+            end
+        end)
+    end
+end
+
+-- Add collision detection to volleyball when it's created
+hook.Add("OnEntityCreated", "SetupVolleyballCollision", function(ent)
+    timer.Simple(0.1, function()
+        AddBlockCollisionToVolleyball(ent)
     end)
 end)
+
+-- Also add collision detection to existing volleyballs when blocks are created
+local function SetupExistingVolleyballsForBlocks()
+    for _, ent in ipairs(ents.FindByClass("prop_physics")) do
+        AddBlockCollisionToVolleyball(ent)
+    end
+end
 
 -- Test command to create a dummy block wall for testing collision
 concommand.Add("test_block_wall", function(ply)
@@ -1674,13 +1962,13 @@ concommand.Add("test_block_wall", function(ply)
     -- Create a test block panel in front of the player
     local blocker = ents.Create("prop_dynamic")
     blocker:SetModel("models/props/court/blockpanel_s.mdl")
-    blocker:SetPos(ply:GetPos() + ply:GetForward() * 100 + Vector(0, 0, 50))
+    blocker:SetPos(ply:GetPos() + ply:GetForward() * 100 + Vector(0, 0, 150))
     blocker:SetAngles(ply:GetAngles())
     blocker:SetName("kabe") -- Tag it for collision detection
     blocker:SetMaterial("models/wireframe") -- Make it visible
     blocker:SetSolid(SOLID_VPHYSICS)
 
-    -- Set creator information BEFORE spawning
+    -- Set creator information BEFORE spawning - use player's own team
     local creatorTeam = ply:Team()
     blocker:SetNWInt("BlockCreatorTeam", creatorTeam)
     blocker:SetNWString("BlockCreator", ply:Nick())
@@ -1701,7 +1989,49 @@ concommand.Add("test_block_wall", function(ply)
         end
     end)
 
-    ply:ChatPrint("Test block wall created! Check console for debug info.")
+    ply:ChatPrint("Test block wall created (your team)! Check console for debug info.")
+end)
+
+-- Test command to create a dummy block wall from TEAM 2 for testing
+concommand.Add("test_opposite_block", function(ply)
+    if not IsValid(ply) then return end
+
+    -- Create a test block panel in front of the player
+    local blocker = ents.Create("prop_dynamic")
+    blocker:SetModel("models/props/court/blockpanel_s.mdl")
+    blocker:SetPos(ply:GetPos() + ply:GetForward() * 100 + Vector(0, 0, 150))
+    blocker:SetAngles(ply:GetAngles())
+    blocker:SetName("kabe") -- Tag it for collision detection
+    blocker:SetMaterial("models/wireframe") -- Make it visible (but red to indicate team 2)
+    blocker:SetColor(Color(255, 0, 0, 255)) -- Red color to indicate team 2
+    blocker:SetSolid(SOLID_VPHYSICS)
+
+    -- Set creator information BEFORE spawning - always use TEAM 2
+    local fakeBlockerName = "Team2Blocker"
+
+    blocker:SetNWInt("BlockCreatorTeam", 2) -- Always team 2
+    blocker:SetNWString("BlockCreator", fakeBlockerName)
+
+    blocker:Spawn()
+
+    -- Setup collision detection for existing volleyballs
+    SetupExistingVolleyballsForBlocks()
+
+    -- Verify the values after spawning
+    timer.Simple(0.1, function()
+        if IsValid(blocker) then
+            print("Team 2 block wall spawned - Team:", blocker:GetNWInt("BlockCreatorTeam", -1), "Name:", blocker:GetNWString("BlockCreator", "NOT_SET"))
+        end
+    end)
+
+    -- Remove after 30 seconds
+    timer.Simple(30, function()
+        if IsValid(blocker) then
+            blocker:Remove()
+        end
+    end)
+
+    ply:ChatPrint("Team 2 test block wall created (RED)! Hit the ball into this to test block scoring.")
 end)
 --[[
 net.Receive("predictBall",function(bits,ply) 

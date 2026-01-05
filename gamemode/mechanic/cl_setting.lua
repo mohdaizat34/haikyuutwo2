@@ -7,6 +7,7 @@ allow_old_receive = false
 allow_warmup = false
 allow_ball_prediction = false -- Ball landing prediction toggle
 allow_in_out_system = true -- IN/OUT referee system toggle
+allow_competitive_mode = true -- Competitive mode toggle (enables scoring and boundaries)
 
 local frameIsOpen = false 
 local PANEL = {}
@@ -246,28 +247,30 @@ function PANEL:Init()
     -- )
     -- yOffset = yOffset + 70
 
-    -- -- Game Mode Section
-    -- CreateSettingSection("Game Settings", "Casual? Competitive?", "")
+    -- Game Mode Section (Admin Only)
+    if LocalPlayer():IsAdmin() or LocalPlayer():IsSuperAdmin() then
+        CreateSettingSection("Game Mode", "Enable competitive features? (Admin Only)", "")
 
-    -- -- Warmup Mode
-    -- CreateToggleButtons(yOffset, "WARMUP MODE", "NORMAL MODE",
-    --     function()
-    --         allow_warmup = true
-    --         chat.AddText(Color(50, 200, 50), "✓ Warmup Mode: ENABLED (delays active)")
-    --         net.Start("allow_warmup")
-    --         net.WriteBool(allow_warmup)
-    --         net.SendToServer()
-    --     end,
-    --     function()
-    --         allow_warmup = false
-    --         chat.AddText(Color(200, 50, 50), "✓ Normal Mode: ENABLED (no delays)")
-    --         net.Start("allow_warmup")
-    --         net.WriteBool(allow_warmup)
-    --         net.SendToServer()
-    --     end,
-    --     allow_warmup
-    -- )
-    -- yOffset = yOffset + 60
+        -- Competitive Mode
+        CreateToggleButtons(yOffset, "COMPETITIVE", "CASUAL",
+            function()
+                allow_competitive_mode = true
+                chat.AddText(Color(50, 200, 50), "✓ Competitive Mode: ENABLED (scoring & boundaries active)")
+                net.Start("allow_competitive_mode")
+                net.WriteBool(allow_competitive_mode)
+                net.SendToServer()
+            end,
+            function()
+                allow_competitive_mode = false
+                chat.AddText(Color(200, 50, 50), "✓ Casual Mode: ENABLED (no scoring, no boundaries)")
+                net.Start("allow_competitive_mode")
+                net.WriteBool(allow_competitive_mode)
+                net.SendToServer()
+            end,
+            allow_competitive_mode
+        )
+        yOffset = yOffset + 70
+    end
 
     -- Footer with key hint
     local footer = vgui.Create("DPanel", scroll)
@@ -278,5 +281,10 @@ function PANEL:Init()
         draw.SimpleText("Press N to open settings anytime", "Trebuchet18", w/2, h/2, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 end
+
+-- Competitive Mode Receiver
+net.Receive("allow_competitive_mode", function()
+    allow_competitive_mode = net.ReadBool()
+end)
 
 vgui.Register("MySimpleUI", PANEL, "DFrame")
